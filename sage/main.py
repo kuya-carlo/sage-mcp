@@ -10,9 +10,8 @@ from sage.routers import auth, mcp, commons, admin
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Depending on DB URL setup, you'd initialize pool here.
-    # e.g., db_dsn = f"postgresql://postgres:{settings.supabase_key}@{settings.supabase_url}/postgres"
-    # For now, just a placeholder.
+    await db.connect(settings.supabase_db_url)
+    print("SAGE is ready")
     yield
     await db.disconnect()
 

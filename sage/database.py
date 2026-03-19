@@ -2,6 +2,13 @@ import asyncpg
 from typing import Optional
 from sage.config import settings
 from supabase import create_client, Client
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def get_db():
+    pool = await get_db_pool()
+    async with pool.acquire() as connection:
+        yield connection
 
 class Database:
     def __init__(self):
