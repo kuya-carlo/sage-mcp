@@ -60,6 +60,21 @@ A CHED CMO-seeded curriculum registry. When a student's program isn't cached yet
 ---
 
 ## Setup
+### Docker Compose (recommended)
+```sh
+# Run locally
+docker compose up -d
+```
+### Docker
+```sh
+# Or run from GitHub Container Registry
+docker run -d \
+  --name sage-mcp \
+  -p 8000:8000 \
+  --env-file .env \
+  ghcr.io/kuya-carlo/sage-mcp:latest
+```
+### Bare Metal
 ```bash
 # Clone
 git clone https://github.com/kuya-carlo/sage-mcp
@@ -68,16 +83,6 @@ cd sage-mcp
 # Copy env
 cp .env.example .env
 # Fill in your keys (see .env.example)
-
-# Run locally
-docker compose up -d
-
-# Or run from GitHub Container Registry
-docker run -d \
-  --name sage-mcp \
-  -p 8000:8000 \
-  --env-file .env \
-  ghcr.io/kuya-carlo/sage-mcp:latest
 ```
 
 ### Required env vars
