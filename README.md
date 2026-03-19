@@ -49,6 +49,7 @@ Calls create_semester_tree — builds Notion workspace
 - **Supabase** PostgreSQL — Ghost Commons registry
 - **Gaffa** — CMO PDF scraping + extraction
 - **Docker + Podman** — containerized deployment
+- **GitHub Container Registry** — automated container publishing
 
 ---
 
@@ -68,8 +69,15 @@ cd sage-mcp
 cp .env.example .env
 # Fill in your keys (see .env.example)
 
-# Run
+# Run locally
 docker compose up -d
+
+# Or run from GitHub Container Registry
+docker run -d \
+  --name sage-mcp \
+  -p 8000:8000 \
+  --env-file .env \
+  ghcr.io/kuya-carlo/sage-mcp:latest
 ```
 
 ### Required env vars
@@ -93,7 +101,23 @@ See `.env.example` for full list. Minimum to run:
 
 ---
 
-## Built by
+## Container Registry
+
+SAGE is automatically built and published to GitHub Container Registry on every push to main.
+
+**Pull the latest image:**
+```bash
+docker pull ghcr.io/kuya-carlo/sage-mcp:latest
+```
+
+**Run with environment variables:**
+```bash
+docker run -d \
+  --name sage-mcp \
+  -p 8000:8000 \
+  --env-file .env \
+  ghcr.io/kuya-carlo/sage-mcp:latest
+```
 
 **Built by:** kuya-carlo  — BS Computer Engineering student, Bulacan State University
 
