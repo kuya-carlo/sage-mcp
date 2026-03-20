@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     notion_workspace_id: Optional[str]
     notion_root_page_id: Optional[str]
     fernet_key: str
+    fastmcp_allowed_origins: Optional[str] = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

@@ -30,12 +30,30 @@ async def lifespan(app: FastAPI):
     yield
     await db.disconnect()
 
+# sage/main.py — CHANGE this line:
 mcp_app = mcp_server.http_app(path="/")
+
+# TO:
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware import Middleware
+
+mcp_app = mcp_server.http_app(
+    path="/",
+    middleware=[
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    ]
+)
 
 app = FastAPI(
     title=settings.project_name,
     description="Student Agent for Guided Education API",
-    lifespan=combine_lifespans(lifespan, mcp_app.lifespan)
+    lifespan=combine_lifespans(lifespan, mcp_app.lifespan),
+    allowed_origins=["*"]
 )
 
 # Placeholder dynamic static directory resolution

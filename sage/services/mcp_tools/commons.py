@@ -52,3 +52,14 @@ async def get_commons_tree(program_code: str, year_level: int, semester: int) ->
             "total_courses": 0,
             "seeding_status": "seeding_in_progress"
         }
+
+async def programs() -> list:
+    """
+    Implements the programs MCP tool.
+    Retrieves all program codes and names from the database.
+    """
+    pool = await get_db_pool()
+    query = "SELECT DISTINCT program_code, program_name FROM programs ORDER BY program_code"
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(query)
+    return [{"code": record["program_code"], "name": record["program_name"]} for record in rows]
