@@ -85,6 +85,20 @@ cp .env.example .env
 # Fill in your keys (see .env.example)
 ```
 
+## Add it to your favourite MCP client
+
+```json
+{
+  "mcpServers": [
+    {
+      "name": "sage",
+      "url": "http://{url}:{port}/mcp-server/",
+      "transport": "streamable-http"
+    }
+  ]
+}
+```
+
 ### Required env vars
 
 See `.env.example` for full list. Minimum to run:

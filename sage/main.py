@@ -4,21 +4,38 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from sage.database import db
 from sage.config import settings
+from sage.services.mcp_tools.server import mcp as mcp_server
+from fastmcp.utilities.lifespan import combine_lifespans
+
+
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s"
+)
 
 # Router imports
-from sage.routers import auth, mcp, commons, admin
+from sage.routers import auth, commons, admin
+from sage.routers import mcp as mcp_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await db.connect(settings.supabase_db_url)
-    print("SAGE is ready")
+    logger = logging.getLogger("init")
+    try:
+        await db.connect(settings.supabase_db_url)
+        logger.info("SAGE is ready")
+    except Exception as e:
+        logger.error(f"Failed to connect to database: {e}")
+        raise
     yield
     await db.disconnect()
+
+mcp_app = mcp_server.http_app(path="/")
 
 app = FastAPI(
     title=settings.project_name,
     description="Student Agent for Guided Education API",
-    lifespan=lifespan
+    lifespan=combine_lifespans(lifespan, mcp_app.lifespan)
 )
 
 # Placeholder dynamic static directory resolution
@@ -28,10 +45,12 @@ if os.path.exists(static_dir):
 
 # Include routers
 app.include_router(auth.router)
-app.include_router(mcp.router)
+app.include_router(mcp_router.router)
 app.include_router(commons.router)
 app.include_router(admin.router)
 
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "project": settings.project_name}
+
+app.mount("/mcp-server",mcp_app)
