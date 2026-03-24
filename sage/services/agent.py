@@ -53,10 +53,9 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "program_code": {"type": "string"},
                     "year_level": {"type": "integer"},
-                    "semester": {"type": "integer"},
-                    "workspace_root_id": {"type": "string"}
+                    "semester": {"type": "integer"}
                 },
-                "required": ["program_code", "year_level", "semester", "workspace_root_id"]
+                "required": ["program_code", "year_level", "semester"]
             }
         }
     },
@@ -137,7 +136,6 @@ async def call_tool(tool_name: str, parameters: dict, workspace_id: str) -> dict
                 program_code=parameters["program_code"],
                 year_level=parameters["year_level"],
                 semester=parameters["semester"],
-                workspace_root_id=parameters["workspace_root_id"],
                 workspace_id=workspace_id
             )
         elif tool_name == "breakdown_task":
@@ -168,10 +166,10 @@ async def call_tool(tool_name: str, parameters: dict, workspace_id: str) -> dict
     except Exception as e:
         return {"error": str(e)}
 
-async def run_agent_loop(message: str, workspace_id: str, workspace_root_id: str, max_iterations: int = 10) -> dict:
+async def run_agent_loop(message: str, workspace_id: str, max_iterations: int = 10) -> dict:
     messages = [{"role": "user", "content": message}]
     
-    injected_system_prompt = SAGE_SYSTEM_PROMPT + f"\nUser workspace_id: {workspace_id}\nUser workspace_root_id: {workspace_root_id}"
+    injected_system_prompt = SAGE_SYSTEM_PROMPT + f"\nUser workspace_id: {workspace_id}"
     
     url = f"{settings.vultr_inference_url}/chat/completions"
     headers = {

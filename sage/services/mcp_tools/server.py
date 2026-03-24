@@ -36,12 +36,11 @@ async def get_commons_tree(program_code: str,
 async def create_semester_tree(program_code: str,
                                year_level: int,
                                semester: int,
-                               workspace_root_id: str,
                                workspace_id: str) -> dict:
     """Build Notion workspace for a semester"""
     return await workspace.create_semester_tree(
         program_code.upper(), year_level, semester,
-        workspace_root_id, workspace_id
+        workspace_id=workspace_id
     )
 
 @mcp.tool(annotations={"destructiveHint": False})

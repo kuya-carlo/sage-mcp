@@ -15,16 +15,12 @@ async def mcp_chat(request: ChatRequest, workspace_id: str = Depends(get_current
     Accepts a chat message and runs it against the Claude agentic loop
     with MCP tools exposed.
     """
-    if not settings.notion_root_page_id:
-        raise HTTPException(
-            status_code=500, 
-            detail="Settings missing notion_root_page_id required for SAGE workspace operations"
-        )
+    # Bypassed static workspace_root check to support true multi-user environments
+    workspace_root = getattr(settings, "notion_root_page_id", "")
         
     result = await run_agent_loop(
         message=request.message,
-        workspace_id=workspace_id,
-        workspace_root_id=settings.notion_root_page_id
+        workspace_id=workspace_id
     )
     
     return result
