@@ -3,6 +3,8 @@ FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PORT=5463
+ENV HOST=0.0.0.0
 
 WORKDIR /app
 
@@ -20,7 +22,7 @@ COPY ./static ./static
 # Install dependencies strictly from lockfile
 RUN uv sync --no-dev --no-cache
 
-EXPOSE 8000
+EXPOSE $PORT
 
 # Run in production mode
-CMD ["uvicorn", "sage.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["uvicorn", "sage.main:app", "--host", $HOST, "--port", $PORT, "--proxy-headers"]
