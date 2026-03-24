@@ -1,12 +1,240 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SAGE Onboarding</title>
+    <title>SAGE - Student Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
+
 <body>
-    <h1>Welcome to SAGE!</h1>
-    <p>The Student Agent for Guided Education starts here.</p>
+    <div class="glass-container" id="app">
+        <!-- Loader -->
+        <div id="loader" class="view active">
+            <div class="spinner"></div>
+            <p>Evaluating authentication state...</p>
+        </div>
+
+        <!-- Login View -->
+        <div id="login-view" class="view hidden">
+            <div class="hero">
+                <h1>Welcome to <span class="gradient-text">SAGE</span></h1>
+                <p class="centered-text">Your academic co-pilot connected directly to your Notion workspace.</p>
+            </div>
+
+            <button id="login-btn" class="glow-btn">
+                <svg width="50" height="50" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                        d="M6.017 4.313l55.333 -4.087c6.797 -0.583 8.543 -0.19 12.817 2.917l17.663 12.443c2.913 2.14 3.883 2.723 3.883 5.053v68.243c0 4.277 -1.553 6.807 -6.99 7.193L24.467 99.967c-4.08 0.193 -6.023 -0.39 -8.16 -3.113L3.3 79.94c-2.333 -3.113 -3.3 -5.443 -3.3 -8.167V11.113c0 -3.497 1.553 -6.413 6.017 -6.8z"
+                        fill="#fff" />
+                    <path fill-rule="evenodd" clip-rule="evenodd"
+                        d="M61.35 0.227l-55.333 4.087C1.553 4.7 0 7.617 0 11.113v60.66c0 2.723 0.967 5.053 3.3 8.167l13.007 16.913c2.137 2.723 4.08 3.307 8.16 3.113l64.257 -3.89c5.433 -0.387 6.99 -2.917 6.99 -7.193V20.64c0 -2.21 -0.873 -2.847 -3.443 -4.733L74.167 3.143c-4.273 -3.107 -6.02 -3.5 -12.817 -2.917zM25.92 19.523c-5.247 0.353 -6.437 0.433 -9.417 -1.99L8.927 11.507c-0.77 -0.78 -0.383 -1.753 1.557 -1.947l53.193 -3.887c4.467 -0.39 6.793 1.167 8.54 2.527l9.123 6.61c0.39 0.197 1.36 1.36 0.193 1.36l-54.933 3.307 -0.68 0.047zM19.803 88.3V30.367c0 -2.53 0.777 -3.697 3.103 -3.893L86 22.78c2.14 -0.193 3.107 1.167 3.107 3.693v57.547c0 2.53 -0.39 4.67 -3.883 4.863l-60.377 3.5c-3.493 0.193 -5.043 -0.97 -5.043 -4.083zm59.6 -54.827c0.387 1.75 0 3.5 -1.75 3.7l-2.91 0.577v42.773c-2.527 1.36 -4.853 2.137 -6.797 2.137 -3.107 0 -3.883 -0.973 -6.21 -3.887l-19.03 -29.94v28.967l6.02 1.363s0 3.5 -4.857 3.5l-13.39 0.777c-0.39 -0.78 0 -2.723 1.357 -3.11l3.497 -0.97v-38.3L30.48 40.667c-0.39 -1.75 0.58 -4.277 3.3 -4.473l14.367 -0.967 19.8 30.327v-26.83l-5.047 -0.58c-0.39 -2.143 1.163 -3.7 3.103 -3.89l13.4 -0.78z"
+                        fill="#000" />
+                </svg>
+                Continue with Notion
+            </button>
+        </div>
+
+        <!-- Chat View -->
+        <div id="chat-view" class="view hidden">
+            <div class="chat-header">
+                <h2><span class="gradient-text">SAGE</span></h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="theme-toggle" style="background:none; border:none; cursor:pointer; color:var(--text-secondary); font-size:1.2rem; margin-right:5px;">🌓</button>
+                    <div class="status-badge"><span class="pulse"></span> Connected</div>
+                    <a href="/auth/logout" style="color: var(--text-secondary); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--border-glass); padding: 4px 10px; border-radius: 12px; transition: all 0.3s ease;">Disconnect</a>
+                </div>
+            </div>
+
+            <div class="chat-window" id="chat-messages">
+                <div class="message assistant">
+                    <div class="msg-content">Hello! I am SAGE. Your Notion workspace is linked and armed. What are we
+                        building today?</div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <textarea id="chat-input" placeholder="Ask SAGE to build a semester tree, evaluate cognitive load,..."
+                    rows="1"></textarea>
+                <button id="send-btn" class="send-btn">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+                <button id="stop-btn" class="send-btn hidden" style="background: var(--bg-glass); border: 1px solid var(--text-secondary); color: var(--text-primary);">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const views = {
+                loader: document.getElementById('loader'),
+                login: document.getElementById('login-view'),
+                chat: document.getElementById('chat-view')
+            };
+
+            const switchView = (viewName) => {
+                Object.values(views).forEach(v => {
+                    v.classList.remove('active');
+                    v.classList.add('hidden');
+                });
+                views[viewName].classList.remove('hidden');
+                // Micro-delay for CSS animation trigger
+                setTimeout(() => views[viewName].classList.add('active'), 50);
+            };
+
+            // Theme toggle
+            const themeToggle = document.getElementById('theme-toggle');
+            themeToggle.addEventListener('click', () => {
+                const root = document.documentElement;
+                if (root.getAttribute('data-theme') === 'light') {
+                    root.removeAttribute('data-theme');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    root.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+            // Init theme
+            if (localStorage.getItem('theme') === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+
+            // Check Auth Status
+            fetch('/auth/status')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.authenticated) {
+                        switchView('chat');
+                    } else {
+                        switchView('login');
+                    }
+                })
+                .catch(err => {
+                    console.error("Auth check failed:", err);
+                    switchView('login');
+                });
+
+            // Login action
+            document.getElementById('login-btn').addEventListener('click', () => {
+                window.location.href = '/auth/notion';
+            });
+
+            // Chat logic
+            const sendBtn = document.getElementById('send-btn');
+            const chatInput = document.getElementById('chat-input');
+            const messagesWindow = document.getElementById('chat-messages');
+
+            const appendMessage = (text, role) => {
+                const el = document.createElement('div');
+                el.className = `message ${role}`;
+                const inner = document.createElement('div');
+                inner.className = 'msg-content';
+                if (role === 'assistant') {
+                    inner.innerHTML = marked.parse(text);
+                } else {
+                    inner.textContent = text;
+                }
+                el.appendChild(inner);
+                messagesWindow.appendChild(el);
+                messagesWindow.scrollTop = messagesWindow.scrollHeight;
+            };
+
+            let currentController = null;
+            
+            document.getElementById('stop-btn').addEventListener('click', () => {
+                if (currentController) {
+                    currentController.abort();
+                }
+            });
+
+            const sendMessage = async () => {
+                const text = chatInput.value.trim();
+                if (!text) return;
+
+                appendMessage(text, 'user');
+                chatInput.value = '';
+
+                // Show thinking state
+                const thinkingId = "msg-" + Date.now();
+                const thinkingEl = document.createElement('div');
+                thinkingEl.className = 'message assistant thinking';
+                thinkingEl.id = thinkingId;
+                thinkingEl.innerHTML = '<div class="msg-content"><div class="dot-typing"></div></div>';
+                messagesWindow.appendChild(thinkingEl);
+                messagesWindow.scrollTop = messagesWindow.scrollHeight;
+
+                currentController = new AbortController();
+                
+                // Show stop button & hide send button
+                sendBtn.classList.add('hidden');
+                document.getElementById('stop-btn').classList.remove('hidden');
+
+                try {
+                    const res = await fetch('/mcp/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: text }),
+                        signal: currentController.signal
+                    });
+
+                    if (res.status === 401) {
+                        window.location.href = '/auth/notion';
+                        return;
+                    }
+
+                    const data = await res.json();
+
+                    // remove thinking
+                    const thinkNode = document.getElementById(thinkingId);
+                    if (thinkNode) thinkNode.remove();
+
+                    if (data.error) {
+                        appendMessage(`Error: ${data.error}`, 'assistant');
+                    } else {
+                        appendMessage(data.response || JSON.stringify(data), 'assistant');
+                    }
+                } catch (err) {
+                    const thinkNode = document.getElementById(thinkingId);
+                    if (thinkNode) thinkNode.remove();
+                    
+                    if (err.name === 'AbortError') {
+                        appendMessage(`⛔ Generation immediately halted.`, 'assistant');
+                    } else {
+                        appendMessage(`Network error communicating with SAGE: ${err.message}`, 'assistant');
+                    }
+                } finally {
+                    sendBtn.classList.remove('hidden');
+                    document.getElementById('stop-btn').classList.add('hidden');
+                    currentController = null;
+                }
+            };
+
+            sendBtn.addEventListener('click', sendMessage);
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!document.getElementById('send-btn').classList.contains('hidden')) {
+                         sendMessage();
+                    }
+                }
+            });
+        });
+    </script>
 </body>
+
 </html>
