@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sage.database import db
 from sage.config import settings
 from sage.services.mcp_tools.server import mcp as mcp_server
@@ -30,10 +31,6 @@ async def lifespan(app: FastAPI):
     yield
     await db.disconnect()
 
-# sage/main.py — CHANGE this line:
-mcp_app = mcp_server.http_app(path="/")
-
-# TO:
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware import Middleware
 
@@ -72,3 +69,8 @@ async def health_check():
     return {"status": "ok", "project": settings.project_name}
 
 app.mount("/mcp-server",mcp_app)
+app.mount("/static",StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+async def read_frontend():
+    return FileResponse("static/index.html")
