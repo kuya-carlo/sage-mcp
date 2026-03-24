@@ -1,5 +1,5 @@
 # SAGE — Student Agent for Guided Education
-> Your academic co-pilot, built on Notion.
+> Your autonomous academic co-pilot, built purely on Notion and FastMCP.
 
 ![SAGE Demo](assets/demo.gif)
 
@@ -9,7 +9,7 @@ Built for **MLH Global Hack Week — Notion AI Challenge**
 
 ## What is SAGE?
 
-SAGE is a Notion MCP-powered academic agent for Filipino university students. Tell it your program and year level — it fetches your CHED-verified curriculum from the Ghost Commons registry and builds your entire semester workspace in Notion automatically.
+SAGE is an advanced, multi-tenant Notion MCP-powered academic agent for Filipino university students. Tell it your program and year level — it securely authenticates your Notion workspace via OAuth, fetches your CHED-verified curriculum from the Ghost Commons registry, dynamically expands curriculum tags into functional study databases using AI, and builds your entire semester workspace in Notion automatically.
 
 ---
 
@@ -17,12 +17,13 @@ SAGE is a Notion MCP-powered academic agent for Filipino university students. Te
 
 | Feature | Status |
 |---|---|
-| Semester tree builder | ✅ MVP |
-| ADHD micro-breakdown | ✅ MVP |
-| Burnout sensor | 🚧 In progress |
-| Ghost Commons registry | ✅ MVP |
-| Opportunity Sentinel | 📋 Roadmap |
-| LMS Chrome extension | 📋 Roadmap |
+| Pure Python FastMCP Proxy Architecture | ✅ Deployed |
+| Multi-Tenant Notion OAuth & Encryption | ✅ Deployed |
+| Dynamic AI Semester Builder | ✅ Deployed |
+| ADHD Micro-Task Breakdown | ✅ Deployed |
+| Burnout & Cognitive Load Sensor | ✅ Deployed |
+| Web UI (Markdown, Themes, Abort Control) | ✅ Deployed |
+| Ghost Commons Registry | ✅ Deployed |
 
 ---
 
@@ -30,32 +31,30 @@ SAGE is a Notion MCP-powered academic agent for Filipino university students. Te
 ```
 Student: "I'm a 2nd year BS CpE student, semester 1"
     ↓
-SAGE calls get_commons_tree via Notion MCP
+SAGE authenticates via custom Notion OAuth & encrypts token to Supabase
+    ↓
+SAGE's Agent calls `create_semester_tree` natively via FastMCP
     ↓
 Fetches CHED CMO-verified curriculum from Ghost Commons
     ↓
-Calls create_semester_tree — builds Notion workspace
+AI dynamically expands competencies into exact study prompts and summaries
     ↓
-6 course pages, task databases, competency tags — done
+Spawns internal Pure Python FastMCP Server to execute secure I/O
+    ↓
+Hierarchical Notion Course Pages & Theme-tracked Topic Databases — done
 ```
 
 ---
 
 ## Tech stack
 
-- **FastAPI** — hosted MCP server + Ghost Commons API
-- **Notion MCP** — workspace orchestration
-- **Qwen2.5-Coder-32B** via Vultr Serverless Inference
-- **Supabase** PostgreSQL — Ghost Commons registry
-- **Gaffa** — CMO PDF scraping + extraction
-- **Docker + Podman** — containerized deployment
-- **GitHub Container Registry** — automated container publishing
-
----
-
-## Ghost Commons
-
-A CHED CMO-seeded curriculum registry. When a student's program isn't cached yet, SAGE triggers lazy seeding — Gaffa scrapes the official CMO PDF, extracts structured curriculum data via AI, and loads it automatically.
+- **FastAPI** — High-performance backend & Chat Proxy
+- **FastMCP (Pure Python)** — 100% Native Architecture for Notion I/O Operations
+- **Notion OAuth 2.0** — Multi-tenant secure workspace integration
+- **Qwen2.5-Coder-32B** via Vultr Serverless Inference (AI Curriculum Expansion)
+- **Supabase** PostgreSQL — Core database & Fernet-encrypted Token Vault
+- **Docker + Podman** — Containerized deployment
+- **GitHub Container Registry** — Automated container publishing
 
 ---
 
@@ -64,15 +63,6 @@ A CHED CMO-seeded curriculum registry. When a student's program isn't cached yet
 ```sh
 # Run locally
 docker compose up -d
-```
-### Docker
-```sh
-# Or run from GitHub Container Registry
-docker run -d \
-  --name sage-mcp \
-  -p 8000:8000 \
-  --env-file .env \
-  ghcr.io/kuya-carlo/sage-mcp:latest
 ```
 ### Bare Metal
 ```bash
@@ -83,19 +73,21 @@ cd sage-mcp
 # Copy env
 cp .env.example .env
 # Fill in your keys (see .env.example)
+
+uv run fastapi dev sage/main.py
 ```
 
 ## Add it to your favourite MCP client
 
+SAGE natively exposes its own macro-tools via a standard stdio FastMCP server.
 ```json
 {
-  "mcpServers": [
-    {
-      "name": "sage",
-      "url": "http://{url}:{port}/mcp-server/",
-      "transport": "streamable-http"
+  "mcpServers": {
+    "sage": {
+      "command": "uv",
+      "args": ["run", "fastmcp", "run", "sage/services/mcp_tools/server.py:mcp"]
     }
-  ]
+  }
 }
 ```
 
@@ -103,10 +95,9 @@ cp .env.example .env
 
 See `.env.example` for full list. Minimum to run:
 - `SUPABASE_URL` + `SUPABASE_KEY` + `SUPABASE_DB_URL`
-- `NOTION_INTERNAL_TOKEN` + `NOTION_WORKSPACE_ID` + `NOTION_ROOT_PAGE_ID`
+- `NOTION_CLIENT_ID` + `NOTION_CLIENT_SECRET` + `NOTION_REDIRECT_URI`
 - `VULTR_INFERENCE_KEY` + `VULTR_INFERENCE_URL`
-- `GAFFA_API_KEY`
-- `FERNET_KEY` + `ADMIN_KEY`
+- `FERNET_KEY`
 
 ---
 
@@ -119,24 +110,6 @@ See `.env.example` for full list. Minimum to run:
 - **v2.0** — Federated Ghost Commons, Tagalog/English bridges
 
 ---
-
-## Container Registry
-
-SAGE is automatically built and published to GitHub Container Registry on every push to main.
-
-**Pull the latest image:**
-```bash
-docker pull ghcr.io/kuya-carlo/sage-mcp:latest
-```
-
-**Run with environment variables:**
-```bash
-docker run -d \
-  --name sage-mcp \
-  -p 8000:8000 \
-  --env-file .env \
-  ghcr.io/kuya-carlo/sage-mcp:latest
-```
 
 **Built by:** kuya-carlo  — BS Computer Engineering student, Bulacan State University
 
