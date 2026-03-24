@@ -1,7 +1,7 @@
 import httpx
 import asyncio
 
-BASE = "http://localhost:8000"
+BASE = "http://127.0.0.1:8000"
 
 async def test():
     async with httpx.AsyncClient() as c:
@@ -47,4 +47,5 @@ async def test():
         )
         print(f"[mcp/chat] {r.status_code} {r.text[:300]}")
 
-asyncio.run(test())
+if __name__ == "__main__":
+    asyncio.run(test())
