@@ -28,12 +28,12 @@ async def append_block_children(block_id: str, children: list) -> dict:
         return response.json()
 
 @notion_mcp.tool()
-async def search(query: str) -> list:
+async def search(query: str, object_type: str = "page") -> list:
     url = f"{BASE_URL}/search"
     payload: dict = {
         "filter": {
             "property": "object",
-            "value": "page"
+            "value": object_type
         }
     }
     if query:
@@ -50,7 +50,7 @@ async def create_page(parent_id: str, title: str, icon_emoji: str = "📚") -> d
     url = f"{BASE_URL}/pages"
     payload = {
         "parent": {"page_id": parent_id},
-        "properties": {"title": [{"text": {"content": title}}]},
+        "properties": {"title": [{"type": "text", "text": {"content": title}}]},
         "icon": {"type": "emoji", "emoji": icon_emoji}
     }
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -63,8 +63,8 @@ async def create_page(parent_id: str, title: str, icon_emoji: str = "📚") -> d
 async def create_database(parent_page_id: str, title: str, properties: dict) -> dict:
     url = f"{BASE_URL}/databases"
     payload = {
-        "parent": {"type": "page_id", "page_id": parent_page_id},
-        "title": [{"text": {"content": title}}],
+        "parent": {"page_id": parent_page_id},
+        "title": [{"type": "text", "text": {"content": title}}],
         "properties": properties
     }
     async with httpx.AsyncClient(timeout=30.0) as client:

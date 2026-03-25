@@ -17,24 +17,8 @@ async def get_weekly_load(workspace_id: str, week_start_date: str) -> dict:
     week_start = start_dt.strftime("%Y-%m-%d")
     week_end = week_end_dt.strftime("%Y-%m-%d")
     
-    # Query Notion search for all databases in workspace with "Tasks" in title
-    search_url = f"{notion_service.BASE_URL}/search"
-    search_payload = {
-        "query": "Tasks",
-        "filter": {
-            "property": "object",
-            "value": "database"
-        }
-    }
-    
-    async with httpx.AsyncClient() as client:
-        search_res = await client.post(
-            search_url,
-            headers=notion_service._get_headers(access_token),
-            json=search_payload
-        )
-        search_res.raise_for_status()
-        databases = search_res.json().get("results", [])
+    # 2. Get Tasks databases
+    databases = await notion_service.search_databases(access_token, query="Tasks")
 
     async def get_tasks_count_for_week(db_list: list, w_start: str, w_end: str) -> int:
         count = 0
@@ -58,7 +42,6 @@ async def get_weekly_load(workspace_id: str, week_start_date: str) -> dict:
             past_w_start_dt.strftime("%Y-%m-%d"), 
             past_w_end_dt.strftime("%Y-%m-%d")
         )
-        # Even if 0, we track it since it's a valid week
         past_counts.append(past_count)
         
     avg_past_3_weeks = sum(past_counts) / 3.0 if past_counts else None
@@ -79,23 +62,7 @@ async def get_weekly_load(workspace_id: str, week_start_date: str) -> dict:
 async def block_calendar_slot(workspace_id: str, date: str, label: str) -> dict:
     access_token = await get_decrypted_token(workspace_id)
     
-    search_url = f"{notion_service.BASE_URL}/search"
-    search_payload = {
-        "query": "SAGE Calendar",
-        "filter": {
-            "property": "object",
-            "value": "database"
-        }
-    }
-    
-    async with httpx.AsyncClient() as client:
-        search_res = await client.post(
-            search_url,
-            headers=notion_service._get_headers(access_token),
-            json=search_payload
-        )
-        search_res.raise_for_status()
-        databases = search_res.json().get("results", [])
+    databases = await notion_service.search_databases(access_token, query="SAGE Calendar")
         
     calendar_db_id = None
     for db in databases:
@@ -106,13 +73,17 @@ async def block_calendar_slot(workspace_id: str, date: str, label: str) -> dict:
             break
             
     if not calendar_db_id and databases:
-        # Fallback if fuzzy search returned something but exact text matched differently
         calendar_db_id = databases[0]["id"]
         
     if not calendar_db_id:
+        # Fallback parent ID usually comes from configuration
         parent_page_id = settings.notion_root_page_id
         if not parent_page_id:
-            raise ValueError("notion_root_page_id is not configured in settings. Cannot create SAGE Calendar.")
+            # If not configured, we try to find ONE page to act as parent
+            pages = await notion_service.search_pages(access_token, query="")
+            if not pages:
+                 raise ValueError("Could not find any pages to host the SAGE Calendar. Grant access to a page!")
+            parent_page_id = pages[0]["id"]
             
         db_properties = {
             "Name": {"title": {}},

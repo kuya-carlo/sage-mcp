@@ -94,10 +94,14 @@ class NotionService:
         })
 
     async def search_pages(self, access_token: str, query: str) -> List[Dict[str, Any]]:
-        res = await self._call_mcp(access_token, "search", {"query": query})
+        res = await self._call_mcp(access_token, "search", {"query": query, "object_type": "page"})
         if isinstance(res, list):
             return res
-        elif isinstance(res, dict):
-            return res.get("results", [])
+        return []
+
+    async def search_databases(self, access_token: str, query: str) -> List[Dict[str, Any]]:
+        res = await self._call_mcp(access_token, "search", {"query": query, "object_type": "database"})
+        if isinstance(res, list):
+            return res
         return []
 
