@@ -1,6 +1,8 @@
 import asyncio
-from fastmcp.client import Client
 import traceback
+
+from fastmcp.client import Client
+
 
 async def main():
     config = {

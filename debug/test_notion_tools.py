@@ -1,7 +1,9 @@
 import asyncio
-from fastmcp.client import Client
 import os
 import traceback
+
+from fastmcp.client import Client
+
 
 async def main():
     config = {
@@ -18,7 +20,7 @@ async def main():
         async with client:
             tools = await client.session.list_tools()
             print([t.name for t in tools.tools])
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
 
 asyncio.run(main())

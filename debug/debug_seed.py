@@ -1,8 +1,10 @@
 import asyncio
 import sys
+
 sys.path.insert(0, '.')
 
 from sage.services.etl.gaffa import search_and_extract_cmo
+
 
 async def test():
     try:
