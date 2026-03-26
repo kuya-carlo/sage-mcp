@@ -60,6 +60,7 @@ Hierarchical Notion Course Pages & Theme-tracked Topic Databases — done
 
 ## Setup
 ### Docker Compose (recommended)
+
 ```sh
 # Run locally
 docker compose up -d

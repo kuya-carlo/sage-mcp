@@ -1,0 +1,12 @@
+services:
+  web:
+    build: .
+    env_file:
+      - .env
+    environment:
+      - PORT=5463
+      - HOST=0.0.0.0
+    ports:
+      - "5463:5463"
+    network_mode: "host"
+    restart: unless-stopped
