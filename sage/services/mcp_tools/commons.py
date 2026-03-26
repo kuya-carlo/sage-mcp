@@ -1,6 +1,8 @@
 import asyncio
+
 from sage.database import get_db_pool
 from sage.services.etl.seeder import seed_program
+
 
 async def get_commons_tree(program_code: str, year_level: int, semester: int) -> dict:
     """

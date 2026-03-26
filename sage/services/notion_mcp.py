@@ -1,9 +1,9 @@
-import httpx
-from fastmcp import FastMCP
 import os
 import sys
-from typing import Any, Optional
+
+import httpx
 from dotenv import load_dotenv
+from fastmcp import FastMCP
 
 load_dotenv()
 

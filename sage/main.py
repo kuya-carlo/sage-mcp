@@ -78,10 +78,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def read_frontend():
     return FileResponse("static/index.html")
 
+
 if __name__ == "__main__":
-    uvicorn.run(
-        "sage.main:app", 
-        host=settings.host, 
-        port=settings.port, 
-        reload=True
-    )
+    import uvicorn
+
+    uvicorn.run("sage.main:app", host=settings.host, port=settings.port, reload=True)

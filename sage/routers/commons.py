@@ -1,8 +1,9 @@
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List
+
 from sage.database import get_db_pool
-from sage.routers.auth import get_current_user
 from sage.models.cmo import CMORecord
+from sage.routers.auth import get_current_user
 
 router = APIRouter(prefix="/commons", tags=["Ghost Commons API"])
 
@@ -17,7 +18,7 @@ async def get_programs():
         
     return {"programs": [record["program_code"] for record in records]}
 
-@router.get("/tree", response_model=List[CMORecord])
+@router.get("/tree", response_model=list[CMORecord])
 async def get_commons_tree(
     program_code: str, 
     year_level: int, 
@@ -39,7 +40,7 @@ async def get_commons_tree(
         
     return [dict(record) for record in records]
 
-@router.get("/search", response_model=List[CMORecord])
+@router.get("/search", response_model=list[CMORecord])
 async def search_commons(
     q: str = Query(..., description="Search query"),
     workspace_id: str = Depends(get_current_user)

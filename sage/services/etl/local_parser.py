@@ -2,10 +2,12 @@
 # In-house PDF processing using PyMuPDF (fitz) + Tesseract OCR
 # This is Option C: Zero cloud costs, but requires more CPU juice.
 
-import fitz # PyMuPDF
+import io
+
+import fitz  # PyMuPDF
 import pytesseract
 from PIL import Image
-import io
+
 
 async def process_pdf_locally(pdf_bytes: bytes) -> list[str]:
     """

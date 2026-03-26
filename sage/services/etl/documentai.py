@@ -5,7 +5,6 @@
 import base64
 import json
 
-import httpx
 from google.cloud import documentai
 from google.oauth2 import service_account
 

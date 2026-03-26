@@ -3,7 +3,9 @@
 # CMO extraction is done inline in gaffa.py via parse_json action.
 
 import json
+
 import httpx
+
 from sage.config import settings
 
 EXTRACTION_SYSTEM_PROMPT = """
@@ -56,7 +58,8 @@ def chunk_text_blocks(blocks: list[str],
         if len(text) > max_chars * 2: # Keep them reasonable
              text = text[:max_chars * 2]
         chunks.append(text)
-        if i + 8 >= len(blocks): break
+        if i + 8 >= len(blocks):
+            break
         
     return chunks
 

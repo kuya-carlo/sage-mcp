@@ -1,8 +1,9 @@
 # sage/services/mcp_tools/mcp_server.py
 
 from fastmcp import FastMCP
-from sage.services.mcp_tools import commons, workspace, tasks, sensor
+
 from sage.services.agent import SAGE_SYSTEM_PROMPT
+from sage.services.mcp_tools import commons, sensor, tasks, workspace
 
 mcp = FastMCP("SAGE")
 

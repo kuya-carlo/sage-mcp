@@ -1,11 +1,9 @@
-import httpx
 from datetime import datetime, timedelta
-from typing import Dict, Any
 
 from sage.config import settings
 from sage.database import get_db_pool
-from sage.services.notion import NotionService
 from sage.services.mcp_tools.workspace import get_decrypted_token
+from sage.services.notion import NotionService
 
 notion_service = NotionService()
 

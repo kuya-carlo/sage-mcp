@@ -1,11 +1,13 @@
+import json
+import re
+
+import httpx
 from cryptography.fernet import Fernet
 from fastapi import HTTPException
+
 from sage.config import settings
 from sage.database import get_db_pool
 from sage.services.notion import NotionService
-import httpx
-import json
-import re
 
 # Note: In an MCP tool context, these might be called directly by the agent
 # and might not need to throw HTTP exceptions if the agent is expected to handle them.

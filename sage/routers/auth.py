@@ -1,14 +1,17 @@
-from fastapi import APIRouter, Response, Request, HTTPException, Depends
-from fastapi.responses import RedirectResponse
-import httpx
 import base64
+import urllib.parse
+
+import httpx
 from cryptography.fernet import Fernet
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import RedirectResponse
+
 from sage.config import settings
 from sage.database import get_db_pool
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-import urllib.parse
+
 
 @router.get("/notion")
 async def notion_login():

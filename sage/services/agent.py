@@ -1,9 +1,9 @@
 import json
+
 import httpx
-from typing import Dict, Any
 
 from sage.config import settings
-from sage.services.mcp_tools import commons, workspace, tasks, sensor
+from sage.services.mcp_tools import commons, sensor, tasks, workspace
 
 SAGE_SYSTEM_PROMPT = """
 You are SAGE, an academic co-pilot for Filipino university
@@ -37,11 +37,11 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "program_code": {"type": "string"},
                     "year_level": {"type": "integer"},
-                    "semester": {"type": "integer"}
+                    "semester": {"type": "integer"},
                 },
-                "required": ["program_code", "year_level", "semester"]
-            }
-        }
+                "required": ["program_code", "year_level", "semester"],
+            },
+        },
     },
     {
         "type": "function",
@@ -53,11 +53,11 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "program_code": {"type": "string"},
                     "year_level": {"type": "integer"},
-                    "semester": {"type": "integer"}
+                    "semester": {"type": "integer"},
                 },
-                "required": ["program_code", "year_level", "semester"]
-            }
-        }
+                "required": ["program_code", "year_level", "semester"],
+            },
+        },
     },
     {
         "type": "function",
@@ -69,11 +69,11 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "task_id": {"type": "string"},
                     "task_title": {"type": "string"},
-                    "task_notes": {"type": "string"}
+                    "task_notes": {"type": "string"},
                 },
-                "required": ["task_id", "task_title"]
-            }
-        }
+                "required": ["task_id", "task_title"],
+            },
+        },
     },
     {
         "type": "function",
@@ -84,11 +84,11 @@ TOOLS_SCHEMA = [
                 "type": "object",
                 "properties": {
                     "workspace_id": {"type": "string"},
-                    "week_start_date": {"type": "string"}
+                    "week_start_date": {"type": "string"},
                 },
-                "required": ["workspace_id", "week_start_date"]
-            }
-        }
+                "required": ["workspace_id", "week_start_date"],
+            },
+        },
     },
     {
         "type": "function",
@@ -100,11 +100,11 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "workspace_id": {"type": "string"},
                     "date": {"type": "string"},
-                    "label": {"type": "string"}
+                    "label": {"type": "string"},
                 },
-                "required": ["workspace_id", "date", "label"]
-            }
-        }
+                "required": ["workspace_id", "date", "label"],
+            },
+        },
     },
     {
         "type": "function",
@@ -113,15 +113,13 @@ TOOLS_SCHEMA = [
             "description": "Check if user dismissed a burnout block this week",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "workspace_id": {"type": "string"},
-                    "week": {"type": "string"}
-                },
-                "required": ["workspace_id", "week"]
-            }
-        }
-    }
+                "properties": {"workspace_id": {"type": "string"}, "week": {"type": "string"}},
+                "required": ["workspace_id", "week"],
+            },
+        },
+    },
 ]
+
 
 async def call_tool(tool_name: str, parameters: dict, workspace_id: str) -> dict:
     try:
@@ -129,105 +127,104 @@ async def call_tool(tool_name: str, parameters: dict, workspace_id: str) -> dict
             return await commons.get_commons_tree(
                 program_code=parameters["program_code"],
                 year_level=parameters["year_level"],
-                semester=parameters["semester"]
+                semester=parameters["semester"],
             )
         elif tool_name == "create_semester_tree":
             return await workspace.create_semester_tree(
                 program_code=parameters["program_code"],
                 year_level=parameters["year_level"],
                 semester=parameters["semester"],
-                workspace_id=workspace_id
+                workspace_id=workspace_id,
             )
         elif tool_name == "breakdown_task":
             return await tasks.breakdown_task(
                 task_id=parameters["task_id"],
                 task_title=parameters["task_title"],
                 task_notes=parameters.get("task_notes", "none"),
-                workspace_id=workspace_id
+                workspace_id=workspace_id,
             )
         elif tool_name == "get_weekly_load":
             return await sensor.get_weekly_load(
-                workspace_id=workspace_id,
-                week_start_date=parameters["week_start_date"]
+                workspace_id=workspace_id, week_start_date=parameters["week_start_date"]
             )
         elif tool_name == "block_calendar_slot":
             return await sensor.block_calendar_slot(
-                workspace_id=workspace_id,
-                date=parameters["date"],
-                label=parameters["label"]
+                workspace_id=workspace_id, date=parameters["date"], label=parameters["label"]
             )
         elif tool_name == "get_dismissed_blocks":
             return await sensor.get_dismissed_blocks(
-                workspace_id=workspace_id,
-                week=parameters["week"]
+                workspace_id=workspace_id, week=parameters["week"]
             )
         else:
             return {"error": f"Unknown tool: {tool_name}"}
     except Exception as e:
         return {"error": str(e)}
 
+
 async def run_agent_loop(message: str, workspace_id: str, max_iterations: int = 10) -> dict:
     messages = [{"role": "user", "content": message}]
-    
+
     injected_system_prompt = SAGE_SYSTEM_PROMPT + f"\nUser workspace_id: {workspace_id}"
-    
+
     url = f"{settings.vultr_inference_url}/chat/completions"
     headers = {
         "Authorization": f"Bearer {settings.vultr_inference_key}",
         "HTTP-Referer": settings.or_site_url or "http://localhost:8000",
-        "X-Title": settings.or_app_name or "SAGE"
+        "X-Title": settings.or_app_name or "SAGE",
     }
-    
+
     async with httpx.AsyncClient() as client:
         for iteration in range(max_iterations):
             payload = {
                 "model": "Qwen2.5-Coder-32B-Instruct",
                 "messages": [{"role": "system", "content": injected_system_prompt}] + messages,
                 "tools": TOOLS_SCHEMA,
-                "max_tokens": 1000
+                "max_tokens": 1000,
             }
-            
+
             response = await client.post(url, headers=headers, json=payload, timeout=60.0)
             response.raise_for_status()
             resp_data = response.json()
-            
+
             assistant_message = resp_data["choices"][0]["message"]
-            
+
             # The structure of assistant_message directly from OpenRouter usually matches OpenAI API schema
             tool_calls = assistant_message.get("tool_calls", [])
             content = assistant_message.get("content")
-            
+
             # Append the assistant's entire message back to the array for context matching
             messages.append(assistant_message)
-            
+
             if tool_calls:
                 for tool_call in tool_calls:
                     call_id = tool_call["id"]
                     func_name = tool_call["function"]["name"]
-                    
+
                     try:
                         func_args = json.loads(tool_call["function"]["arguments"])
                     except json.JSONDecodeError:
                         func_args = {}
-                        
+
                     tool_result = await call_tool(func_name, func_args, workspace_id)
-                    
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": call_id,
-                        "content": json.dumps(tool_result)
-                    })
+
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": call_id,
+                            "content": json.dumps(tool_result),
+                        }
+                    )
                 # Continue loop after handling all tool calls
             else:
                 # Text only response -> Finish
                 return {
                     "response": content or "",
                     "tool_calls_made": sum("tool_calls" in m for m in messages),
-                    "iterations": iteration + 1
+                    "iterations": iteration + 1,
                 }
-                
+
     return {
         "response": "I ran into a problem completing that. Please try again.",
         "tool_calls_made": max_iterations,
-        "iterations": max_iterations
+        "iterations": max_iterations,
     }

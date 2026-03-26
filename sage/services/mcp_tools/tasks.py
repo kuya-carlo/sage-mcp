@@ -1,8 +1,10 @@
 import json
+
 import httpx
+
 from sage.config import settings
-from sage.services.notion import NotionService
 from sage.services.mcp_tools.workspace import get_decrypted_token
+from sage.services.notion import NotionService
 
 notion_service = NotionService()
 

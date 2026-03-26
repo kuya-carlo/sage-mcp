@@ -1,6 +1,7 @@
 ## sage/services/etl/gaffa.py
 
 import httpx
+
 from sage.config import settings
 
 KNOWN_PH_UNIVERSITIES = [
@@ -39,7 +40,8 @@ def _filter_university_result(results: list[dict]) -> str | None:
     # Secondary check for edu.ph domains
     for result in results:
         url = result.get("url", "").lower()
-        if "ched.gov.ph" in url: continue
+        if "ched.gov.ph" in url:
+            continue
         if ".edu.ph" in url and ".pdf" in url:
             return result.get("url")
 
