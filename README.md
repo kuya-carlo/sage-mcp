@@ -62,7 +62,7 @@ Hierarchical Notion Course Pages & Theme-tracked Topic Databases — done
 ### Docker Compose (recommended)
 
 ```sh
-# Run locally
+# Run locally, has both db and server in.
 docker compose up -d
 ```
 ### Bare Metal
@@ -77,6 +77,8 @@ cp .env.example .env
 
 uv run fastapi dev sage/main.py
 ```
+
+Then seed your programs
 
 ## Add it to your favourite MCP client
 
@@ -95,10 +97,32 @@ SAGE natively exposes its own macro-tools via a standard stdio FastMCP server.
 ### Required env vars
 
 See `.env.example` for full list. Minimum to run:
-- `SUPABASE_URL` + `SUPABASE_KEY` + `SUPABASE_DB_URL`
+- `DB_URL`
 - `NOTION_CLIENT_ID` + `NOTION_CLIENT_SECRET` + `NOTION_REDIRECT_URI`
-- `VULTR_INFERENCE_KEY` + `VULTR_INFERENCE_URL`
 - `FERNET_KEY`
+
+---
+
+## Technical Caveats & Edge Cases
+
+SAGE is currently in **v1.0 (Beta)**. Below are the known system behaviors and technical boundaries.
+
+### ✅ What Works (Robustly Handled)
+- **Fuzzy AI Output** — Uses regex to strip AI preambles and extract JSON from within chatty model responses.
+- **Cold Boot Seeding** — Automatically triggers background ETL if a requested program is not in the Ghost Commons registry.
+- **Idempotency** — Searches Notion for existing pages before building to prevent duplicate workspace clutter.
+- **AI Fallback** — Reverts to raw competency tags if the AI expansion model fails to generate specific topics.
+
+### ⚠️ Current Limitations
+- **Cloudflare Interaction** — Automated syllabus extraction via `gaffa` has low success rates against sites protected by Cloudflare.
+- **Cold Boot Instability** — Program seeding is partially volatile; fetching university-specific syllabi relies on open access which is sometimes blocked by institutional firewalls.
+- **Permissions** — SAGE only sees what you share. You must explicitly share a parent page with the SAGE integration.
+- **Rate Limiting** — No exponential backoff for Notion 429s yet; hits a limit and fails the current tool call.
+
+### 🚨 Critical Risks (Technical Debt)
+- **Process "Fork-Bombing"** — Every Notion tool call spawns a new Python process via `uv run fastmcp`. Large semesters (>8 courses) can trigger **300+ process spawns**, potentially causing HTTP timeouts or CPU exhaustion.
+- **Fernet Key Persistence** — Rotating the `FERNET_KEY` without a migration plan will lock all existing users out of their encrypted tokens.
+- **Notion Block Limit** — Appending >100 blocks at once (e.g., massive curriculum expansions) will fail due to Notion's batch API limits.
 
 ---
 
