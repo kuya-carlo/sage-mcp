@@ -1,0 +1,38 @@
+repos:
+  - repo: builtin
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.0
+    hooks:
+      - id: ruff
+        args: [ --fix ]
+      - id: ruff-format
+
+  - repo: https://github.com/allganize/ty-pre-commit
+    rev: v0.0.25
+    hooks:
+      - id: ty-check
+        language: system
+
+  - repo: https://github.com/semgrep/pre-commit
+    rev: 'v1.156.0'
+    hooks:
+      - id: semgrep
+        entry: semgrep
+        args: [ '--config', 'p/python', '--error', '--skip-unknown-extensions' ]
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline', 'scan']
+        exclude: package.lock  # Optional: exclude high-entropy noise
+
+  # - repo: https://github.com/pypa/pip-audit
+  #   rev: v2.7.3
+  #   hooks:
+  #     - id: pip-audit
+  #       args: [ '--local' ] #Security stuff, find a way for this to not yell.
