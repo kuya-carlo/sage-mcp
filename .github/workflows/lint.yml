@@ -31,7 +31,7 @@ jobs:
         run: uv run ruff format . --check
 
       - name: Type Checking (ty)
-        run: uv run ty check
+        run: uvx ty check
 
       - name: Security Scan (Semgrep)
         run: |
