@@ -1,10 +1,25 @@
 services:
-  web:
-    build: .
+  db:
+    image: postgres:16-alpine
     environment:
-      - PORT=5463
-      - HOST=0.0.0.0
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ur_secure_password # Use a real one here!
+      POSTGRES_DB: sage_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  web:
+    image: ghcr.io/kuya-carlo/sage-mcp:latest
+    environment:
+      - DB_URL=postgresql://postgres:ur_secure_password@db:5432/sage_db?prepared_statement_cache_size=0
+      - NOTION_CLIENT_ID=notion_client_id
+      - NOTION_CLIENT_SECRET=notion_client_secret
+      - NOTION_REDIRECT_URI=notion_redirect_uri
+      - FERNET_KEY=fernet_key
     ports:
       - "5463:5463"
-    network_mode: "host"
+    depends_on:
+      - db
     restart: unless-stopped
+
+volumes:
+  postgres_data:

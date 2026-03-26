@@ -25,4 +25,4 @@ RUN uv sync --no-dev --no-cache
 EXPOSE $PORT
 
 # Run in production mode
-CMD uvicorn sage.main:app --host $HOST --port $PORT --proxy-headers
+CMD uv run uvicorn sage.main:app --host $HOST --port $PORT --proxy-headers
