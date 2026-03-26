@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="static/favicon.ico" type="image/x-icon">
     <title>SAGE - Student Agent</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,17 +43,25 @@
                     <img src="/static/logo.png" alt="SAGE" style="width: 32px; height: 32px; border-radius: 8px;">
                     <h2><span class="gradient-text">SAGE</span></h2>
                 </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <button id="theme-toggle" style="background:none; border:none; cursor:pointer; color:var(--text-secondary); font-size:1.2rem; margin-right:5px;">🌓</button>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <div id="burnout-container" class="burnout-meter hidden">
+                        <div class="meter-label">COGNITIVE LOAD</div>
+                        <div class="meter-bar">
+                            <div id="load-fill" class="meter-fill" style="width: 0%"></div>
+                        </div>
+                        <span id="load-text">--%</span>
+                    </div>
+                    <button id="theme-toggle"
+                        style="background:none; border:none; cursor:pointer; color:var(--text-secondary); font-size:1.2rem;">🌓</button>
                     <div class="status-badge"><span class="pulse"></span> Connected</div>
-                    <a href="/auth/logout" style="color: var(--text-secondary); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--border-glass); padding: 4px 10px; border-radius: 12px; transition: all 0.3s ease;">Disconnect</a>
+                    <a href="/auth/logout"
+                        style="color: var(--text-secondary); text-decoration: none; font-size: 0.85rem; border: 1px solid var(--border-glass); padding: 4px 10px; border-radius: 12px; transition: all 0.3s ease;">Disconnect</a>
                 </div>
             </div>
 
             <div class="chat-window" id="chat-messages">
                 <div class="message assistant">
-                    <div class="msg-content">Hello! I am SAGE. Your Notion workspace is linked and armed. What are we
-                        building today?</div>
+                    <div class="msg-content">Hello! I am SAGE. Your Notion workspace is linked and armed. What are we building today?</div>
                 </div>
             </div>
 
@@ -66,7 +75,8 @@
                         <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                     </svg>
                 </button>
-                <button id="stop-btn" class="send-btn hidden" style="background: var(--bg-glass); border: 1px solid var(--text-secondary); color: var(--text-primary);">
+                <button id="stop-btn" class="send-btn hidden"
+                    style="background: var(--bg-glass); border: 1px solid var(--text-secondary); color: var(--text-primary);">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                         <rect x="6" y="6" width="12" height="12" rx="2"></rect>
                     </svg>
@@ -83,15 +93,51 @@
                 chat: document.getElementById('chat-view')
             };
 
+            // Login action
+            document.getElementById('login-btn').addEventListener('click', () => {
+                window.location.href = '/auth/notion';
+            });
+
+            // Burnout Meter logic
+            const updateLoadStatus = async () => {
+                try {
+                    const res = await fetch('/mcp/load-status');
+                    if (!res.ok) return;
+                    const data = await res.json();
+
+                    const container = document.getElementById('burnout-container');
+                    const fill = document.getElementById('load-fill');
+                    const text = document.getElementById('load-text');
+
+                    container.classList.remove('hidden');
+                    const score = data.load_score || 0;
+                    fill.style.width = `${Math.min(score, 100)}%`;
+                    text.textContent = `${Math.round(score)}%`;
+
+                    fill.classList.remove('warning', 'danger');
+                    if (score > 85) fill.classList.add('danger');
+                    else if (score > 60) fill.classList.add('warning');
+                } catch (err) {
+                    console.error("Failed to update load status:", err);
+                }
+            };
+
             const switchView = (viewName) => {
                 Object.values(views).forEach(v => {
                     v.classList.remove('active');
                     v.classList.add('hidden');
                 });
                 views[viewName].classList.remove('hidden');
-                // Micro-delay for CSS animation trigger
+                if (viewName === 'chat') {
+                    updateLoadStatus();
+                }
                 setTimeout(() => views[viewName].classList.add('active'), 50);
             };
+
+            // Poll load status periodically when in chat view
+            setInterval(() => {
+                if (views.chat.classList.contains('active')) updateLoadStatus();
+            }, 300000);
 
             // Theme toggle
             const themeToggle = document.getElementById('theme-toggle');
@@ -125,11 +171,6 @@
                     switchView('login');
                 });
 
-            // Login action
-            document.getElementById('login-btn').addEventListener('click', () => {
-                window.location.href = '/auth/notion';
-            });
-
             // Chat logic
             const sendBtn = document.getElementById('send-btn');
             const chatInput = document.getElementById('chat-input');
@@ -151,7 +192,7 @@
             };
 
             let currentController = null;
-            
+
             document.getElementById('stop-btn').addEventListener('click', () => {
                 if (currentController) {
                     currentController.abort();
@@ -175,7 +216,7 @@
                 messagesWindow.scrollTop = messagesWindow.scrollHeight;
 
                 currentController = new AbortController();
-                
+
                 // Show stop button & hide send button
                 sendBtn.classList.add('hidden');
                 document.getElementById('stop-btn').classList.remove('hidden');
@@ -189,7 +230,7 @@
                     });
 
                     if (res.status === 401) {
-                        window.location.href = '/auth/notion';
+                        window.location.href = '/auth/logout';
                         return;
                     }
 
@@ -207,7 +248,7 @@
                 } catch (err) {
                     const thinkNode = document.getElementById(thinkingId);
                     if (thinkNode) thinkNode.remove();
-                    
+
                     if (err.name === 'AbortError') {
                         appendMessage(`⛔ Generation immediately halted.`, 'assistant');
                     } else {
@@ -225,7 +266,7 @@
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     if (!document.getElementById('send-btn').classList.contains('hidden')) {
-                         sendMessage();
+                        sendMessage();
                     }
                 }
             });

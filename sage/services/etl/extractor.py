@@ -15,6 +15,8 @@ Output schema (array of objects):
 [{
   "program_code": string,
   "cmo_reference": string,
+  "academic_year": string,
+  "classification": string,
   "year_level": integer,
   "semester": integer,
   "course_code": string,
@@ -24,49 +26,63 @@ Output schema (array of objects):
 
 Rules:
 - Extract every course listed. Do not summarize or skip.
-- year_level must be integer 1-4.
+- program_code and academic_year can often be found in the header: "(REVISED)POLICIES, STANDARDS AND GUIDELINES FOR THE {program} ({program_shorthand}) EFFECTIVE (AY) {ay}."
+- classification must be one of: [core_gened, shared_major, program_specific, elective].
+    * core_gened: General Education (English, Math, History, etc.)
+    * shared_major: Technical courses shared between IT/CS/IS (e.g., Intro to Computing, Programming 1/2).
+    * program_specific: Courses specific to this degree (e.g., Operating Systems, VLSI, Network Admin).
+    * elective: Any elective course.
+- academic_year should be in format "AY YYYY-YYYY" or simply the year found.
+- year_level must be integer 1-5.
 - semester must be integer 1 or 2.
 - competency_tags must be lowercase, 1-3 words each, max 4 tags.
-- If a field cannot be determined, use null — never guess.
+- IMPORTANT: If year_level or semester are not explicitly in the course row, infer them from the section headers (e.g., "First Year", "Second Semester") found earlier in the text.
+- If a field genuinely cannot be determined even with context, use null.
 """
 
 
 def chunk_text_blocks(blocks: list[str],
-                      max_chars: int = 24000) -> list[str]:
-    chunks, current, count = [], [], 0
-    for block in blocks:
-        if count + len(block) > max_chars:
-            chunks.append("\n".join(current))
-            current, count = [], 0
-        current.append(block)
-        count += len(block)
-    if current:
-        chunks.append("\n".join(current))
+                      max_chars: int = 15000,
+                      overlap_pages: int = 2) -> list[str]:
+    """
+    Chunks text blocks with overlap to ensure context (like year/sem headers)
+    isn't lost between chunks.
+    """
+    chunks = []
+    # We'll use a sliding window of pages
+    for i in range(0, len(blocks), max(1, len(blocks) // 5)): # Ensure at least 5 chunks
+        window = blocks[i : i + 8] # Try to take 8 pages at a time
+        text = "\n".join(window)
+        if len(text) > max_chars * 2: # Keep them reasonable
+             text = text[:max_chars * 2]
+        chunks.append(text)
+        if i + 8 >= len(blocks): break
+        
     return chunks
 
 
 async def extract_records(chunk: str,
                           program_code: str) -> list[dict]:
+    url = f"{settings.vultr_inference_url}/chat/completions"
     headers = {
-        "Authorization": f"Bearer {settings.openrouter_api_key}",
-        "HTTP-Referer": settings.or_site_url,
-        "X-Title": settings.or_app_name,
+        "Authorization": f"Bearer {settings.vultr_inference_key}",
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "google/gemini-flash-1.5",
+        "model": "Qwen2.5-Coder-32B-Instruct",
         "messages": [
             {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
             {"role": "user", "content": chunk}
-        ]
+        ],
+        "temperature": 0.1
     }
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            url,
             json=payload,
             headers=headers,
-            timeout=60.0
+            timeout=180.0
         )
         response.raise_for_status()
 
@@ -91,10 +107,10 @@ async def extract_records(chunk: str,
         }
         async with httpx.AsyncClient() as client:
             retry = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                url,
                 json=retry_payload,
                 headers=headers,
-                timeout=60.0
+                timeout=180.0
             )
             retry.raise_for_status()
 

@@ -23,26 +23,32 @@ GAFFA_BASE_URL = "https://api.gaffa.dev/v1/browser/requests"
 
 
 def _filter_university_result(results: list[dict]) -> str | None:
+    # We skip official CHED CHOs as per user request to use university-specific curriculums
     for result in results:
-        text = (
-            (result.get("title") or "") + " " +
-            (result.get("snippet") or "")
-        ).lower()
+        url = result.get("url", "").lower()
+        if "ched.gov.ph" in url:
+            continue
+            
+        text = ((result.get("title") or "") + " " + (result.get("snippet") or "")).lower()
+        
+        # Look for university-specific PDF links
         if any(uni in text for uni in KNOWN_PH_UNIVERSITIES):
-            url = result.get("url", "")
-            if url.endswith(".pdf") or ".pdf" in url:
-                return url
+            if ".pdf" in url:
+                return result.get("url")
 
+    # Secondary check for edu.ph domains
     for result in results:
-        url = result.get("url", "")
+        url = result.get("url", "").lower()
+        if "ched.gov.ph" in url: continue
         if ".edu.ph" in url and ".pdf" in url:
-            return url
+            return result.get("url")
 
     return None
 
 
 async def extract_cmo_from_pdf(pdf_url: str,
                                 program_code: str) -> list[dict]:
+    program_code = program_code.upper() # Ensure all-caps
     payload = {
         "url": pdf_url,
         "proxy_location": "us",
@@ -97,6 +103,11 @@ async def extract_cmo_from_pdf(pdf_url: str,
                                         "description": "Semester 1 or 2"
                                     },
                                     {
+                                        "type": "string",
+                                        "name": "classification",
+                                        "description": "One of: core_gened, shared_major, program_specific, elective"
+                                    },
+                                    {
                                         "type": "array",
                                         "name": "competency_tags",
                                         "description": "2 to 4 short skill descriptors",
@@ -115,15 +126,15 @@ async def extract_cmo_from_pdf(pdf_url: str,
                     "instruction": (
                         "This is a Philippine CHED CMO curriculum document. "
                         "Extract every course in the curriculum table. "
+                        "Identify the course classification: core_gened (minor subjects), "
+                        "shared_major (ITE core), program_specific (majors), or elective. "
                         "Year level and semester must be integers. "
                         "competency_tags must be lowercase 1-3 word descriptors. "
-                        "If year_level or semester cannot be determined, "
-                        "infer from context. "
-                        "Return null for fields that genuinely cannot be found."
+                        "If year_level or semester cannot be determined, infer from context."
                     ),
                     "model": "gpt-4o-mini",
                     "output_type": "inline",
-                    "max_pages": 15
+                    "max_pages": 50
                 }
             ]
         }
@@ -169,11 +180,13 @@ async def extract_cmo_from_pdf(pdf_url: str,
         records.append({
             "program_code": program_code,
             "cmo_reference": cmo_reference,
+            "classification": course.get("classification"),
             "year_level": course.get("year_level"),
             "semester": course.get("semester"),
             "course_code": course.get("course_code"),
             "course_title": course.get("course_title"),
             "competency_tags": tags[:4],
+            "academic_year": None, # Will be filled by search context if needed
             "source": "ched_cmo",
             "embedding": None
         })
@@ -183,10 +196,11 @@ async def extract_cmo_from_pdf(pdf_url: str,
 
 async def search_and_extract_cmo(program_name: str,
                                   program_code: str) -> list[dict]:
+    program_code = program_code.upper()
     payload = {
         "url": (
             f"https://www.google.com/search"
-            f"?q=CHED+CMO+{program_name.replace(' ', '+')}+filetype:pdf"
+            f"?q={program_name.replace(' ', '+')}+prospectus+curriculum+PH+PDF"
         ),
         "proxy_location": "us",
         "async": False,
@@ -197,8 +211,8 @@ async def search_and_extract_cmo(program_name: str,
             "actions": [
                 {
                     "type": "wait",
-                    "selector": "#search",
-                    "timeout": 10000,
+                    "selector": "body",
+                    "timeout": 5000,
                     "continue_on_fail": True
                 },
                 {
@@ -267,6 +281,9 @@ async def search_and_extract_cmo(program_name: str,
         return []
 
     results = parse_action["output"].get("results", [])
+    print(f"[gaffa] Discovered {len(results)} search results.")
+    for r in results:
+        print(f"  - {r.get('url')}")
     pdf_url = _filter_university_result(results)
 
     if not pdf_url:

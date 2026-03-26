@@ -6,9 +6,11 @@ from uuid import UUID
 class CMORecord(BaseModel):
     id: UUID
     program_code: str
-    cmo_reference: str
-    year_level: int = Field(ge=1, le=5)
-    semester: int = Field(ge=1, le=4)
+    cmo_reference: Optional[str] = None
+    academic_year: Optional[str] = None
+    classification: Optional[str] = None # core_gened, shared_major, program_specific, elective
+    year_level: Optional[int] = Field(None, ge=1, le=5)
+    semester: Optional[int] = Field(None, ge=1, le=4)
     course_code: str
     course_title: str
     competency_tags: List[str] = Field(min_length=1, max_length=4)
@@ -18,9 +20,11 @@ class CMORecord(BaseModel):
 
 class CMORecordCreate(BaseModel):
     program_code: str
-    cmo_reference: str
-    year_level: int = Field(ge=1, le=5)
-    semester: int = Field(ge=1, le=4)
+    cmo_reference: Optional[str] = None
+    academic_year: Optional[str] = None
+    classification: Optional[str] = None 
+    year_level: Optional[int] = Field(None, ge=1, le=5)
+    semester: Optional[int] = Field(None, ge=1, le=4)
     course_code: str
     course_title: str
     competency_tags: List[str] = Field(min_length=1, max_length=4)

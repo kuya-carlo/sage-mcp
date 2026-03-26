@@ -7,25 +7,40 @@ from pydantic import ValidationError
 
 
 PROGRAM_NAME_MAP = {
-    "BSCPE": "BS Computer Engineering",
-    "BSCS":  "BS Computer Science",
-    "BSIT":  "BS Information Technology",
-    "BSECE": "BS Electronics Engineering",
-    "BSIE":  "BS Industrial Engineering",
+    "BSCPE": "Bachelor of Science in Computer Engineering",
+    "BSCS":  "Bachelor of Science in Computer Science",
+    "BSIT":  "Bachelor of Science in Information Technology",
+    "BSIS":  "Bachelor of Science in Information Systems",
+    "BSECE": "Bachelor of Science in Electronics Engineering",
+    "BSIE":  "Bachelor of Science in Industrial Engineering",
+    "BSA":   "Bachelor of Science in Accountancy",
+    "BSCE":  "Bachelor of Science in Civil Engineering",
+    "BSPY":  "Bachelor of Science in Psychology",
+    "BSN":   "Bachelor of Science in Nursing",
 }
+
+PROGRAMS_UPSERT_SQL = """
+    INSERT INTO programs (program_code, program_name, degree_level)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (program_code) DO NOTHING;
+"""
 
 UPSERT_SQL = """
     INSERT INTO cmo_records (
-        program_code, cmo_reference, year_level,
-        semester, course_code, course_title,
+        program_code, cmo_reference, academic_year, classification,
+        year_level, semester, course_code, course_title,
         competency_tags, source
     ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
     )
     ON CONFLICT (program_code, cmo_reference, course_code)
     DO UPDATE SET
         course_title     = EXCLUDED.course_title,
-        competency_tags  = EXCLUDED.competency_tags;
+        competency_tags  = EXCLUDED.competency_tags,
+        academic_year    = EXCLUDED.academic_year,
+        classification   = EXCLUDED.classification,
+        year_level       = EXCLUDED.year_level,
+        semester         = EXCLUDED.semester;
 """
 
 FAILED_SQL = """
@@ -40,14 +55,31 @@ async def upsert_records(records: list[dict],
     async with get_db() as conn:
         for record in records:
             try:
+                # Use target program_code if missing in raw extraction
+                prog = record.get("program_code") or program_code
+                prog = prog.upper()
+                record["program_code"] = prog
+                
+                # Ensure program entry exists
+                prog_name = PROGRAM_NAME_MAP.get(prog, prog)
+                await conn.execute(PROGRAMS_UPSERT_SQL, prog, prog_name, "Undergraduate")
+                
+                # Sanitize noisy semester/year data
+                if "semester" in record and record["semester"] is not None:
+                    if record["semester"] < 1: record["semester"] = None
+                if "year_level" in record and record["year_level"] is not None:
+                    if record["year_level"] < 1: record["year_level"] = None
+
                 validated = CMORecordCreate(**record)
                 await conn.execute(
                     UPSERT_SQL,
                     validated.program_code,
-                    validated.cmo_reference,
+                    validated.cmo_reference or "N/A",
+                    validated.academic_year,
+                    validated.classification,
                     validated.year_level,
                     validated.semester,
-                    validated.course_code,
+                    validated.course_code.upper(), # Caps in DB
                     validated.course_title,
                     validated.competency_tags,
                     validated.source,

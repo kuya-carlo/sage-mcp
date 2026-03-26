@@ -32,3 +32,22 @@ async def get_mcp_tools():
     Used for inspection/debugging without requiring authentication.
     """
     return {"tools": TOOLS_SCHEMA}
+
+@router.get("/load-status")
+async def get_load_status(workspace_id: str = Depends(get_current_user)):
+    """
+    Fetches the current week's weight/burnout score from the Notion Tasks DB.
+    """
+    from sage.services.mcp_tools.sensor import get_weekly_load
+    from datetime import datetime, timedelta
+    
+    # Get the Monday of this week for better consistency
+    today = datetime.now()
+    monday = today - timedelta(days=today.weekday())
+    week_start = monday.strftime("%Y-%m-%d")
+    
+    try:
+        data = await get_weekly_load(workspace_id, week_start)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

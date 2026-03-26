@@ -70,7 +70,10 @@ class NotionService:
             "database_id": database_id,
             "filter_dict": filter_dict
         })
-        return res if res is not None else []
+        if isinstance(res, dict) and "error" in res:
+            print(f"Notion MCP error (get_database_entries): {res['error']}")
+            return []
+        return res if isinstance(res, list) else []
 
     async def query_tasks_due_this_week(self, access_token: str, database_id: str, week_start: str, week_end: str) -> List[Dict[str, Any]]:
         filter_dict = {
@@ -95,13 +98,14 @@ class NotionService:
 
     async def search_pages(self, access_token: str, query: str) -> List[Dict[str, Any]]:
         res = await self._call_mcp(access_token, "search", {"query": query, "object_type": "page"})
-        if isinstance(res, list):
-            return res
-        return []
+        if isinstance(res, dict) and "error" in res:
+            print(f"Notion MCP error (search_pages): {res['error']}")
+            return []
+        return res if isinstance(res, list) else []
 
     async def search_databases(self, access_token: str, query: str) -> List[Dict[str, Any]]:
         res = await self._call_mcp(access_token, "search", {"query": query, "object_type": "database"})
-        if isinstance(res, list):
-            return res
-        return []
-
+        if isinstance(res, dict) and "error" in res:
+            print(f"Notion MCP error (search_databases): {res['error']}")
+            return []
+        return res if isinstance(res, list) else []

@@ -12,7 +12,11 @@ from google.oauth2 import service_account
 from sage.config import settings
 
 
-def _load_credentials() -> service_account.Credentials:
+def _load_credentials() -> service_account.Credentials | None:
+    if not settings.google_credentials_base64:
+        print("[documentai] GOOGLE_CREDENTIALS_BASE64 is missing.")
+        return None
+        
     credentials_json = base64.b64decode(
         settings.google_credentials_base64
     ).decode("utf-8")
@@ -33,6 +37,9 @@ async def process_pdf_bytes(pdf_bytes: bytes) -> list[str]:
     Returns list of page text strings.
     Used by: routers/admin.py user syllabus upload endpoint (v1.4)
     """
+    if not _credentials:
+        raise ValueError("Google Cloud credentials are not configured. Cannot use Document AI.")
+        
     client = documentai.DocumentProcessorServiceAsyncClient(
         credentials=_credentials
     )

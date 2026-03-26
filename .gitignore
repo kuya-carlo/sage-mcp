@@ -11,3 +11,7 @@ wheels/
 
 # Environmental Variables
 .env
+
+# Sample files
+*.pdf
+*.sql

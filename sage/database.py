@@ -20,7 +20,11 @@ class Database:
         self.supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
 
     async def connect(self, dsn: str):
-        self.pool = await asyncpg.create_pool(dsn=dsn)
+        self.pool = await asyncpg.create_pool(
+            dsn=dsn,
+            min_size=1,
+            max_size=5 # Supabase session mode limit
+        )
 
     async def disconnect(self):
         if self.pool:
