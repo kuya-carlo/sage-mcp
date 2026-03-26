@@ -10,7 +10,7 @@ async def main():
             "notion": {
                 "transport": "sse",
                 "url": "https://mcp.notion.com/mcp",
-                "headers": {"Authorization": "Bearer fake_token"}
+                "headers": {"Authorization": "Bearer fake_token"},
             }
         }
     }
@@ -22,5 +22,6 @@ async def main():
     except Exception as e:
         print("SSE Error:", type(e).__name__, str(e))
         traceback.print_exc()
+
 
 asyncio.run(main())

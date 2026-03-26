@@ -9,7 +9,7 @@ class CMORecord(BaseModel):
     program_code: str
     cmo_reference: str | None = None
     academic_year: str | None = None
-    classification: str | None = None # core_gened, shared_major, program_specific, elective
+    classification: str | None = None  # core_gened, shared_major, program_specific, elective
     year_level: int | None = Field(None, ge=1, le=5)
     semester: int | None = Field(None, ge=1, le=4)
     course_code: str
@@ -19,11 +19,12 @@ class CMORecord(BaseModel):
     created_at: datetime
     embedding: list[float] | None = None
 
+
 class CMORecordCreate(BaseModel):
     program_code: str
     cmo_reference: str | None = None
     academic_year: str | None = None
-    classification: str | None = None 
+    classification: str | None = None
     year_level: int | None = Field(None, ge=1, le=5)
     semester: int | None = Field(None, ge=1, le=4)
     course_code: str
@@ -31,6 +32,7 @@ class CMORecordCreate(BaseModel):
     competency_tags: list[str] = Field(min_length=1, max_length=4)
     source: str = "ched_cmo"
     embedding: None = None
+
 
 class FailedExtraction(BaseModel):
     program_code: str

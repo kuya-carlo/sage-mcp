@@ -15,14 +15,11 @@ def _load_credentials() -> service_account.Credentials | None:
     if not settings.google_credentials_base64:
         print("[documentai] GOOGLE_CREDENTIALS_BASE64 is missing.")
         return None
-        
-    credentials_json = base64.b64decode(
-        settings.google_credentials_base64
-    ).decode("utf-8")
+
+    credentials_json = base64.b64decode(settings.google_credentials_base64).decode("utf-8")
     credentials_dict = json.loads(credentials_json)
     return service_account.Credentials.from_service_account_info(
-        credentials_dict,
-        scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        credentials_dict, scopes=["https://www.googleapis.com/auth/cloud-platform"]
     )
 
 
@@ -38,10 +35,8 @@ async def process_pdf_bytes(pdf_bytes: bytes) -> list[str]:
     """
     if not _credentials:
         raise ValueError("Google Cloud credentials are not configured. Cannot use Document AI.")
-        
-    client = documentai.DocumentProcessorServiceAsyncClient(
-        credentials=_credentials
-    )
+
+    client = documentai.DocumentProcessorServiceAsyncClient(credentials=_credentials)
 
     processor_name = (
         f"projects/{settings.google_cloud_project}"
@@ -49,15 +44,9 @@ async def process_pdf_bytes(pdf_bytes: bytes) -> list[str]:
         f"/processors/{settings.document_ai_processor_id}"
     )
 
-    raw_document = documentai.RawDocument(
-        content=pdf_bytes,
-        mime_type="application/pdf"
-    )
+    raw_document = documentai.RawDocument(content=pdf_bytes, mime_type="application/pdf")
 
-    request = documentai.ProcessRequest(
-        name=processor_name,
-        raw_document=raw_document
-    )
+    request = documentai.ProcessRequest(name=processor_name, raw_document=raw_document)
 
     result = await client.process_document(request=request)
     document = result.document
@@ -67,8 +56,7 @@ async def process_pdf_bytes(pdf_bytes: bytes) -> list[str]:
     for page in document.pages:
         segments = page.layout.text_anchor.text_segments
         page_text = "".join(
-            full_text[int(seg.start_index):int(seg.end_index)]
-            for seg in segments
+            full_text[int(seg.start_index) : int(seg.end_index)] for seg in segments
         )
         pages.append(page_text)
 

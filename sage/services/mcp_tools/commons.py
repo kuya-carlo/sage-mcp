@@ -9,7 +9,7 @@ async def get_commons_tree(program_code: str, year_level: int, semester: int) ->
     Implements the get_commons_tree MCP tool.
     Retrieves curriculum records. If no records are found, it triggers a background
     seeding task and returns a 'seeding_in_progress' status.
-    
+
     When seeding_status is "seeding_in_progress", the agent should inform the user
     to retry in 30-60 seconds.
     """
@@ -21,10 +21,10 @@ async def get_commons_tree(program_code: str, year_level: int, semester: int) ->
         WHERE program_code = $1 AND year_level = $2 AND semester = $3
         ORDER BY course_code
     """
-    
+
     async with pool.acquire() as connection:
         rows = await connection.fetch(query, program_code, year_level, semester)
-        
+
     if rows:
         return {
             "program_code": program_code,
@@ -35,25 +35,26 @@ async def get_commons_tree(program_code: str, year_level: int, semester: int) ->
                     "course_code": row["course_code"],
                     "course_title": row["course_title"],
                     "competency_tags": row["competency_tags"],
-                    "cmo_reference": row["cmo_reference"]
+                    "cmo_reference": row["cmo_reference"],
                 }
                 for row in rows
             ],
             "total_courses": len(rows),
-            "seeding_status": "ready"
+            "seeding_status": "ready",
         }
     else:
         # Trigger background seeding process
         asyncio.create_task(seed_program(program_code))
-        
+
         return {
             "program_code": program_code,
             "year_level": year_level,
             "semester": semester,
             "courses": [],
             "total_courses": 0,
-            "seeding_status": "seeding_in_progress"
+            "seeding_status": "seeding_in_progress",
         }
+
 
 async def programs() -> list:
     """

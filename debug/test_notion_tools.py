@@ -11,7 +11,7 @@ async def main():
             "notion": {
                 "command": "npx",
                 "args": ["-y", "@debuggingmax/mcp-server-notion"],
-                "env": {"NOTION_API_TOKEN": "fake_token", "PATH": os.environ.get("PATH", "")}
+                "env": {"NOTION_API_TOKEN": "fake_token", "PATH": os.environ.get("PATH", "")},
             }
         }
     }
@@ -22,5 +22,6 @@ async def main():
             print([t.name for t in tools.tools])
     except Exception:
         traceback.print_exc()
+
 
 asyncio.run(main())

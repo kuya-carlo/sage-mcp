@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     app_base_url: str | None = None
     admin_key: str | None = None
     fastmcp_allowed_origins: str | None = None
+    notion_root_page_id: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
