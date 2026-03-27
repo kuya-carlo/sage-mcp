@@ -173,58 +173,72 @@ async def run_agent_loop(message: str, workspace_id: str, max_iterations: int = 
         "X-Title": settings.or_app_name or "SAGE",
     }
 
-    async with httpx.AsyncClient() as client:
-        for iteration in range(max_iterations):
-            payload = {
-                "model": "Qwen2.5-Coder-32B-Instruct",
-                "messages": [{"role": "system", "content": injected_system_prompt}] + messages,
-                "tools": TOOLS_SCHEMA,
-                "max_tokens": 1000,
-            }
-
-            response = await client.post(url, headers=headers, json=payload, timeout=60.0)
-            response.raise_for_status()
-            resp_data = response.json()
-
-            assistant_message = resp_data["choices"][0]["message"]
-
-            # The structure of assistant_message directly from OpenRouter usually matches OpenAI API schema
-            tool_calls = assistant_message.get("tool_calls", [])
-            content = assistant_message.get("content")
-
-            # Append the assistant's entire message back to the array for context matching
-            messages.append(assistant_message)
-
-            if tool_calls:
-                for tool_call in tool_calls:
-                    call_id = tool_call["id"]
-                    func_name = tool_call["function"]["name"]
-
-                    try:
-                        func_args = json.loads(tool_call["function"]["arguments"])
-                    except json.JSONDecodeError:
-                        func_args = {}
-
-                    tool_result = await call_tool(func_name, func_args, workspace_id)
-
-                    messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": call_id,
-                            "content": json.dumps(tool_result),
-                        }
-                    )
-                # Continue loop after handling all tool calls
-            else:
-                # Text only response -> Finish
-                return {
-                    "response": content or "",
-                    "tool_calls_made": sum("tool_calls" in m for m in messages),
-                    "iterations": iteration + 1,
+    try:
+        async with httpx.AsyncClient() as client:
+            for iteration in range(max_iterations):
+                payload = {
+                    "model": "Qwen2.5-Coder-32B-Instruct",
+                    "messages": [{"role": "system", "content": injected_system_prompt}] + messages,
+                    "tools": TOOLS_SCHEMA,
+                    "max_tokens": 1000,
                 }
 
+                response = await client.post(url, headers=headers, json=payload, timeout=60.0)
+                if response.status_code != 200:
+                    return {
+                        "error": f"Vultr Inference API error: {response.text}",
+                        "response": "I'm having trouble connecting to my inference brain (Vultr). Please check my API key or network.",
+                    }
+
+                resp_data = response.json()
+                assistant_message = resp_data["choices"][0]["message"]
+
+                # The structure of assistant_message directly from OpenRouter usually matches OpenAI API schema
+                tool_calls = assistant_message.get("tool_calls", [])
+                content = assistant_message.get("content")
+
+                # Append the assistant's entire message back to the array for context matching
+                messages.append(assistant_message)
+
+                if tool_calls:
+                    for tool_call in tool_calls:
+                        call_id = tool_call["id"]
+                        func_name = tool_call["function"]["name"]
+
+                        try:
+                            func_args = json.loads(tool_call["function"]["arguments"])
+                        except json.JSONDecodeError:
+                            func_args = {}
+
+                        tool_result = await call_tool(func_name, func_args, workspace_id)
+
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": call_id,
+                                "content": json.dumps(tool_result),
+                            }
+                        )
+                    # Continue loop after handling all tool calls
+                else:
+                    # Text only response -> Finish
+                    return {
+                        "response": content or "",
+                        "tool_calls_made": sum(
+                            "tool_calls" in m
+                            for (idx, m) in enumerate(messages)
+                            if "tool_calls" in m
+                        ),
+                        "iterations": iteration + 1,
+                    }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "response": f"System error during agent execution: {e}. Let's try that again, something might have timed out.",
+        }
+
     return {
-        "response": "I ran into a problem completing that. Please try again.",
+        "response": "I ran into a problem completing that. I might have hit an iteration limit.",
         "tool_calls_made": max_iterations,
         "iterations": max_iterations,
     }

@@ -234,6 +234,17 @@
                         return;
                     }
 
+                    if (!res.ok) {
+                        let errorDetail = "Unknown server error";
+                        try {
+                            const errorData = await res.json();
+                            errorDetail = errorData.detail || JSON.stringify(errorData);
+                        } catch (e) {
+                            errorDetail = await res.text();
+                        }
+                        throw new Error(`Server returned ${res.status}: ${errorDetail}`);
+                    }
+
                     const data = await res.json();
 
                     // remove thinking
@@ -241,7 +252,7 @@
                     if (thinkNode) thinkNode.remove();
 
                     if (data.error) {
-                        appendMessage(`Error: ${data.error}`, 'assistant');
+                        appendMessage(`### ❌ Request Failed\n\nI encountered an error while processing your request:\n\n> ${data.error}`, 'assistant');
                     } else {
                         appendMessage(data.response || JSON.stringify(data), 'assistant');
                     }
@@ -250,9 +261,10 @@
                     if (thinkNode) thinkNode.remove();
 
                     if (err.name === 'AbortError') {
-                        appendMessage(`⛔ Generation immediately halted.`, 'assistant');
+                        appendMessage(`⛔ **Generation immediately halted.**`, 'assistant');
                     } else {
-                        appendMessage(`Network error communicating with SAGE: ${err.message}`, 'assistant');
+                        const friendlyMsg = `### ⚠️ SAGE Connection Error\n\nSomething went wrong while communicating with my brain. This usually happens if the server is restarting or the connection was interrupted.\n\n**Technical Logs for Nerd Eyes:**\n\`\`\`\n${err.message}\n\`\`\``;
+                        appendMessage(friendlyMsg, 'assistant');
                     }
                 } finally {
                     sendBtn.classList.remove('hidden');

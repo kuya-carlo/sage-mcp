@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     fastmcp_allowed_origins: str | None = None
     notion_root_page_id: str | None = None
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 settings = Settings()  # ty: ignore[missing-argument]
