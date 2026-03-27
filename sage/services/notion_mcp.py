@@ -1,13 +1,16 @@
 import os
 import sys
 
+import fastmcp
 import httpx
 from dotenv import load_dotenv
-from fastmcp import FastMCP
 
 load_dotenv()
 
-notion_mcp = FastMCP("Notion Native Python MCP")
+# Silence FastMCP ASCII banner globally
+fastmcp.settings.show_server_banner = False
+
+notion_mcp = fastmcp.FastMCP("Notion Native Python MCP")
 
 BASE_URL = "https://api.notion.com/v1"
 VERSION = "2022-06-28"

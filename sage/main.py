@@ -2,9 +2,13 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+import fastmcp
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Silence FastMCP ASCII banner globally
+fastmcp.settings.show_server_banner = False
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
