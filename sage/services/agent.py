@@ -162,6 +162,9 @@ async def call_tool(tool_name: str, parameters: dict, workspace_id: str) -> dict
 
 
 async def run_agent_loop(message: str, workspace_id: str, max_iterations: int = 10) -> dict:
+    from sage.services.notion import audit_logs
+
+    audit_logs.set([])  # Reset for this loop
     messages = [{"role": "user", "content": message}]
 
     injected_system_prompt = SAGE_SYSTEM_PROMPT + f"\nUser workspace_id: {workspace_id}"
@@ -188,6 +191,7 @@ async def run_agent_loop(message: str, workspace_id: str, max_iterations: int = 
                     return {
                         "error": f"Vultr Inference API error: {response.text}",
                         "response": "I'm having trouble connecting to my inference brain (Vultr). Please check my API key or network.",
+                        "audit_log": audit_logs.get(),
                     }
 
                 resp_data = response.json()
@@ -230,15 +234,18 @@ async def run_agent_loop(message: str, workspace_id: str, max_iterations: int = 
                             if "tool_calls" in m
                         ),
                         "iterations": iteration + 1,
+                        "audit_log": audit_logs.get(),
                     }
     except Exception as e:
         return {
             "error": str(e),
             "response": f"System error during agent execution: {e}. Let's try that again, something might have timed out.",
+            "audit_log": audit_logs.get(),
         }
 
     return {
         "response": "I ran into a problem completing that. I might have hit an iteration limit.",
         "tool_calls_made": max_iterations,
         "iterations": max_iterations,
+        "audit_log": audit_logs.get(),
     }

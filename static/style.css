@@ -474,3 +474,38 @@ textarea:focus {
     border-radius: 4px;
     font-family: monospace;
 }
+
+/* Audit Log Styling */
+.audit-log {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px dashed var(--border-glass);
+    border-radius: 12px;
+    font-family: 'Inter', monospace;
+    font-size: 0.8rem;
+}
+
+.audit-log summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-secondary);
+    user-select: none;
+    outline: none;
+}
+
+.audit-entries {
+    margin-top: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--accent);
+}
+
+.audit-entries div {
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    margin-bottom: 4px;
+}

@@ -1,6 +1,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Any
 
 import fastmcp
 from dotenv import load_dotenv
@@ -18,6 +19,7 @@ from fastmcp.utilities.lifespan import combine_lifespans
 from sage.config import settings
 from sage.database import db
 from sage.services.mcp_tools.server import mcp as mcp_server
+from sage.services.notion_mcp import notion_mcp as notion_server
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
@@ -27,7 +29,7 @@ from sage.routers import mcp as mcp_router
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: Any):
     logger = logging.getLogger("init")
     try:
         await db.connect(settings.db_url)
@@ -54,10 +56,26 @@ mcp_app = mcp_server.http_app(
     ],
 )
 
+notion_mcp_app = notion_server.http_app(
+    path="/",
+    middleware=[
+        Middleware(
+            CORSMiddleware,  # ty: ignore[invalid-argument-type]
+            allow_origins=["*"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    ],
+)
+
 app = FastAPI(
     title=settings.project_name,
     description="Student Agent for Guided Education API",
-    lifespan=combine_lifespans(lifespan, mcp_app.lifespan),  # ty: ignore[invalid-argument-type]
+    lifespan=combine_lifespans(
+        lifespan,  # ty: ignore[invalid-argument-type]
+        mcp_app.lifespan,
+        notion_mcp_app.lifespan,
+    ),
     allowed_origins=["*"],
 )
 
@@ -79,6 +97,7 @@ async def health_check():
 
 
 app.mount("/mcp-server", mcp_app)
+app.mount("/notion-native-mcp", notion_mcp_app)
 
 
 @app.get("/")

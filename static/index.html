@@ -176,13 +176,24 @@
             const chatInput = document.getElementById('chat-input');
             const messagesWindow = document.getElementById('chat-messages');
 
-            const appendMessage = (text, role) => {
+            const appendMessage = (text, role, auditLog = null) => {
                 const el = document.createElement('div');
                 el.className = `message ${role}`;
                 const inner = document.createElement('div');
                 inner.className = 'msg-content';
                 if (role === 'assistant') {
-                    inner.innerHTML = marked.parse(text);
+                    let html = marked.parse(text);
+                    if (auditLog && auditLog.length > 0) {
+                        html += `
+                            <details class="audit-log">
+                                <summary>🛠️ System Audit Log (${auditLog.length} operations)</summary>
+                                <div class="audit-entries">
+                                    ${auditLog.map(log => `<div>${log}</div>`).join('')}
+                                </div>
+                            </details>
+                        `;
+                    }
+                    inner.innerHTML = html;
                 } else {
                     inner.textContent = text;
                 }
@@ -236,13 +247,15 @@
 
                     if (!res.ok) {
                         let errorDetail = "Unknown server error";
+                        let errorLog = null;
                         try {
                             const errorData = await res.json();
                             errorDetail = errorData.detail || JSON.stringify(errorData);
+                            errorLog = errorData.audit_log;
                         } catch (e) {
                             errorDetail = await res.text();
                         }
-                        throw new Error(`Server returned ${res.status}: ${errorDetail}`);
+                        throw { message: `Server returned ${res.status}: ${errorDetail}`, auditLog: errorLog };
                     }
 
                     const data = await res.json();
@@ -252,9 +265,9 @@
                     if (thinkNode) thinkNode.remove();
 
                     if (data.error) {
-                        appendMessage(`### ❌ Request Failed\n\nI encountered an error while processing your request:\n\n> ${data.error}`, 'assistant');
+                        appendMessage(`### ❌ Request Failed\n\nI encountered an error while processing your request:\n\n> ${data.error}`, 'assistant', data.audit_log);
                     } else {
-                        appendMessage(data.response || JSON.stringify(data), 'assistant');
+                        appendMessage(data.response || JSON.stringify(data), 'assistant', data.audit_log);
                     }
                 } catch (err) {
                     const thinkNode = document.getElementById(thinkingId);
@@ -263,8 +276,8 @@
                     if (err.name === 'AbortError') {
                         appendMessage(`⛔ **Generation immediately halted.**`, 'assistant');
                     } else {
-                        const friendlyMsg = `### ⚠️ SAGE Connection Error\n\nSomething went wrong while communicating with my brain. This usually happens if the server is restarting or the connection was interrupted.\n\n**Technical Logs for Nerd Eyes:**\n\`\`\`\n${err.message}\n\`\`\``;
-                        appendMessage(friendlyMsg, 'assistant');
+                        const friendlyMsg = `### ⚠️ SAGE Connection Error\n\nSomething went wrong while communicating with my brain. This usually happens if the server is restarting or the connection was interrupted.\n\n**Technical Logs for Nerd Eyes:**\n\`\`\`\n${err.message || err}\n\`\`\``;
+                        appendMessage(friendlyMsg, 'assistant', err.auditLog);
                     }
                 } finally {
                     sendBtn.classList.remove('hidden');

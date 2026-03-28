@@ -16,25 +16,27 @@ BASE_URL = "https://api.notion.com/v1"
 VERSION = "2022-06-28"
 
 
-def _get_headers() -> dict:
-    access_token = os.environ.get("NOTION_API_TOKEN")
-    if not access_token:
-        raise ValueError("NOTION_API_TOKEN is missing in environment variables.")
+def _get_headers(access_token: str | None = None) -> dict:
+    token = access_token or os.environ.get("NOTION_API_TOKEN")
+    if not token:
+        raise ValueError("NOTION_API_TOKEN is missing in environment variables or parameter.")
     return {
-        "Authorization": f"Bearer {access_token}",
+        "Authorization": f"Bearer {token}",
         "Notion-Version": VERSION,
         "Content-Type": "application/json",
     }
 
 
 @notion_mcp.tool()
-async def append_block_children(block_id: str, children: list) -> dict:
+async def append_block_children(
+    block_id: str, children: list, access_token: str | None = None
+) -> dict:
     block_id = block_id.strip()
     url = f"{BASE_URL}/blocks/{block_id}/children"
     payload = {"children": children}
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.patch(url, headers=_get_headers(), json=payload)
+            response = await client.patch(url, headers=_get_headers(access_token), json=payload)
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
@@ -44,7 +46,9 @@ async def append_block_children(block_id: str, children: list) -> dict:
 
 
 @notion_mcp.tool()
-async def search(query: str, object_type: str = "page") -> list | dict:
+async def search(
+    query: str, object_type: str = "page", access_token: str | None = None
+) -> list | dict:
     url = f"{BASE_URL}/search"
     payload: dict = {"filter": {"property": "object", "value": object_type}}
     if query:
@@ -52,7 +56,7 @@ async def search(query: str, object_type: str = "page") -> list | dict:
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.post(url, headers=_get_headers(), json=payload)
+            response = await client.post(url, headers=_get_headers(access_token), json=payload)
             response.raise_for_status()
             data = response.json()
             return data.get("results", [])
@@ -63,7 +67,9 @@ async def search(query: str, object_type: str = "page") -> list | dict:
 
 
 @notion_mcp.tool()
-async def create_page(parent_id: str, title: str, icon_emoji: str = "📚") -> dict:
+async def create_page(
+    parent_id: str, title: str, icon_emoji: str = "📚", access_token: str | None = None
+) -> dict:
     parent_id = parent_id.strip()
     url = f"{BASE_URL}/pages"
     payload = {
@@ -73,7 +79,7 @@ async def create_page(parent_id: str, title: str, icon_emoji: str = "📚") -> d
     }
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.post(url, headers=_get_headers(), json=payload)
+            response = await client.post(url, headers=_get_headers(access_token), json=payload)
             response.raise_for_status()
             data = response.json()
             return {"id": data["id"], "url": data.get("url", "")}
@@ -84,7 +90,9 @@ async def create_page(parent_id: str, title: str, icon_emoji: str = "📚") -> d
 
 
 @notion_mcp.tool()
-async def create_database(parent_page_id: str, title: str, properties: dict) -> dict:
+async def create_database(
+    parent_page_id: str, title: str, properties: dict, access_token: str | None = None
+) -> dict:
     parent_page_id = parent_page_id.strip()
     url = f"{BASE_URL}/databases"
     payload = {
@@ -94,7 +102,7 @@ async def create_database(parent_page_id: str, title: str, properties: dict) -> 
     }
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.post(url, headers=_get_headers(), json=payload)
+            response = await client.post(url, headers=_get_headers(access_token), json=payload)
             response.raise_for_status()
             data = response.json()
             return {"id": data["id"]}
@@ -105,13 +113,15 @@ async def create_database(parent_page_id: str, title: str, properties: dict) -> 
 
 
 @notion_mcp.tool()
-async def create_database_entry(database_id: str, properties: dict) -> dict:
+async def create_database_entry(
+    database_id: str, properties: dict, access_token: str | None = None
+) -> dict:
     database_id = database_id.strip()
     url = f"{BASE_URL}/pages"
     payload = {"parent": {"database_id": database_id}, "properties": properties}
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.post(url, headers=_get_headers(), json=payload)
+            response = await client.post(url, headers=_get_headers(access_token), json=payload)
             response.raise_for_status()
             data = response.json()
             return {"id": data["id"]}
@@ -122,13 +132,15 @@ async def create_database_entry(database_id: str, properties: dict) -> dict:
 
 
 @notion_mcp.tool()
-async def update_page_property(page_id: str, property_name: str, value: dict) -> dict:
+async def update_page_property(
+    page_id: str, property_name: str, value: dict, access_token: str | None = None
+) -> dict:
     page_id = page_id.strip()
     url = f"{BASE_URL}/pages/{page_id}"
     payload = {"properties": {property_name: value}}
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.patch(url, headers=_get_headers(), json=payload)
+            response = await client.patch(url, headers=_get_headers(access_token), json=payload)
             response.raise_for_status()
             data = response.json()
             return {"id": data["id"]}
@@ -139,7 +151,9 @@ async def update_page_property(page_id: str, property_name: str, value: dict) ->
 
 
 @notion_mcp.tool()
-async def get_database_entries(database_id: str, filter_dict: dict | None = None) -> list | dict:
+async def get_database_entries(
+    database_id: str, filter_dict: dict | None = None, access_token: str | None = None
+) -> list | dict:
     database_id = database_id.strip()
     url = f"{BASE_URL}/databases/{database_id}/query"
     payload = {}
@@ -147,7 +161,7 @@ async def get_database_entries(database_id: str, filter_dict: dict | None = None
         payload["filter"] = filter_dict
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.post(url, headers=_get_headers(), json=payload)
+            response = await client.post(url, headers=_get_headers(access_token), json=payload)
             response.raise_for_status()
             data = response.json()
             return data.get("results", [])
@@ -158,12 +172,12 @@ async def get_database_entries(database_id: str, filter_dict: dict | None = None
 
 
 @notion_mcp.tool()
-async def get_page(page_id: str) -> dict:
+async def get_page(page_id: str, access_token: str | None = None) -> dict:
     page_id = page_id.strip()
     url = f"{BASE_URL}/pages/{page_id}"
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.get(url, headers=_get_headers())
+            response = await client.get(url, headers=_get_headers(access_token))
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
@@ -173,11 +187,11 @@ async def get_page(page_id: str) -> dict:
 
 
 @notion_mcp.tool()
-async def get_token_info() -> dict:
+async def get_token_info(access_token: str | None = None) -> dict:
     url = f"{BASE_URL}/users/me"
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.get(url, headers=_get_headers())
+            response = await client.get(url, headers=_get_headers(access_token))
             response.raise_for_status()
             data = response.json()
             return {
