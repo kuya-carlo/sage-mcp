@@ -2,34 +2,11 @@ import json
 import re
 
 import httpx
-from cryptography.fernet import Fernet
-from fastapi import HTTPException
 
 from sage.config import settings
 from sage.database import get_db_pool
+from sage.routers.notion_auth import get_notion_token
 from sage.services.notion import NotionService
-
-# Note: In an MCP tool context, these might be called directly by the agent
-# and might not need to throw HTTP exceptions if the agent is expected to handle them.
-# However, instructed to use HTTPException here.
-notion_service = NotionService()
-
-
-async def get_decrypted_token(workspace_id: str) -> tuple[str, str | None]:
-    """Query user_tokens table for workspace_id and decrypt the token."""
-    pool = await get_db_pool()
-    query = "SELECT encrypted_token, root_page_id FROM user_tokens WHERE workspace_id = $1"
-    async with pool.acquire() as connection:
-        record = await connection.fetchrow(query, workspace_id)
-
-    if not record:
-        raise HTTPException(status_code=401, detail="Workspace ID not found or unauthorized")
-
-    encrypted_token = record["encrypted_token"]
-    root_page_id = record.get("root_page_id")
-    fernet = Fernet(settings.fernet_key.encode())
-    decrypted_token = fernet.decrypt(encrypted_token.encode()).decode()
-    return decrypted_token, root_page_id
 
 
 async def get_commons_for_program(program_code: str, year_level: int, semester: int) -> list[dict]:
@@ -116,16 +93,18 @@ async def create_semester_tree(
     workspace_id: str,
     workspace_root_id: str = "",
 ) -> dict:
-    """Read curriculum from Supabase then build a Notion workspace hierarchy."""
-    # 1. get_decrypted_token
-    access_token, saved_root_id = await get_decrypted_token(workspace_id)
+    # 1. get_notion_token
+    access_token = await get_notion_token(workspace_id)
+    notion_service = NotionService(access_token=access_token)
+    # Note: We ignore saved_root_id from old system
+    saved_root_id = None
 
     # Use explicitly passed ID, or saved ID, or fallback to search
     if not workspace_root_id:
         if saved_root_id:
             workspace_root_id = saved_root_id
         else:
-            pages = await notion_service.search_pages(access_token, query="")
+            pages = await notion_service.search_pages(query="")
             if not pages:
                 return {
                     "status": "error",
@@ -144,7 +123,7 @@ async def create_semester_tree(
 
     # 3. Search for existing page
     page_title = f"{program_code} — Year {year_level} Sem {semester}"
-    search_results = await notion_service.search_pages(access_token, query=page_title)
+    search_results = await notion_service.search_pages(query=page_title)
 
     # Check if a matching page already exists within the current root
     for result in search_results:
@@ -161,7 +140,7 @@ async def create_semester_tree(
 
     # 4. Create root page titled "{program_code} — Year {year_level} Sem {semester}" under workspace_root_id with icon 🎓
     root_page_response = await notion_service.create_page(
-        access_token=access_token, parent_id=workspace_root_id, title=page_title, icon_emoji="🎓"
+        parent_id=workspace_root_id, title=page_title, icon_emoji="🎓"
     )
     new_root_page_id = root_page_response["id"]
 
@@ -175,7 +154,6 @@ async def create_semester_tree(
 
         # a. Create sub-page titled course_title under root page with icon 📖
         sub_page_response = await notion_service.create_page(
-            access_token=access_token,
             parent_id=new_root_page_id,
             title=course_title,
             icon_emoji="📖",
@@ -200,7 +178,6 @@ async def create_semester_tree(
         }
 
         await notion_service.create_database(
-            access_token=access_token,
             parent_page_id=sub_page_id,
             title="Tasks",
             properties=db_properties,
@@ -228,7 +205,6 @@ async def create_semester_tree(
             }
 
             topics_db_response = await notion_service.create_database(
-                access_token=access_token,
                 parent_page_id=sub_page_id,
                 title="Topics & Competencies",
                 properties=topics_db_properties,
@@ -242,7 +218,6 @@ async def create_semester_tree(
             for topic_item in expanded_topics:
                 # Create database entry
                 entry = await notion_service.create_database_entry(
-                    access_token=access_token,
                     database_id=topics_db_id,
                     properties={
                         "Topic": {"title": [{"text": {"content": topic_item["topic"]}}]},
@@ -296,7 +271,7 @@ async def create_semester_tree(
                     ]
 
                     await notion_service.append_block_children(
-                        access_token=access_token, page_id=entry["id"], children=children
+                        page_id=entry["id"], children=children
                     )
 
     # 6. Return response

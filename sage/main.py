@@ -19,12 +19,11 @@ from fastmcp.utilities.lifespan import combine_lifespans
 from sage.config import settings
 from sage.database import db
 from sage.services.mcp_tools.server import mcp as mcp_server
-from sage.services.notion_mcp import notion_mcp as notion_server
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
 # Router imports
-from sage.routers import admin, auth, commons
+from sage.routers import admin, commons, notion_auth
 from sage.routers import mcp as mcp_router
 
 
@@ -33,6 +32,25 @@ async def lifespan(app: Any):
     logger = logging.getLogger("init")
     try:
         await db.connect(settings.db_url)
+        # Create OAuth tables if they don't exist
+        assert db.pool is not None
+        async with db.pool.acquire() as conn:
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS notion_tokens (
+                    user_id TEXT PRIMARY KEY,
+                    access_token TEXT NOT NULL,
+                    refresh_token TEXT,
+                    expires_at TIMESTAMP WITH TIME ZONE
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS notion_oauth_states (
+                    session_id TEXT PRIMARY KEY,
+                    code_verifier TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+                )
+            """)
         logger.info("SAGE is ready")
     except Exception as e:
         logger.error(f"Failed to connect to database: {e}")
@@ -56,25 +74,13 @@ mcp_app = mcp_server.http_app(
     ],
 )
 
-notion_mcp_app = notion_server.http_app(
-    path="/",
-    middleware=[
-        Middleware(
-            CORSMiddleware,  # ty: ignore[invalid-argument-type]
-            allow_origins=["*"],
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-    ],
-)
 
 app = FastAPI(
     title=settings.project_name,
     description="Student Agent for Guided Education API",
     lifespan=combine_lifespans(
-        lifespan,  # ty: ignore[invalid-argument-type]
+        lifespan,
         mcp_app.lifespan,
-        notion_mcp_app.lifespan,
     ),
     allowed_origins=["*"],
 )
@@ -85,10 +91,10 @@ if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Include routers
-app.include_router(auth.router)
 app.include_router(mcp_router.router)
 app.include_router(commons.router)
 app.include_router(admin.router)
+app.include_router(notion_auth.router)
 
 
 @app.get("/health")
@@ -97,7 +103,6 @@ async def health_check():
 
 
 app.mount("/mcp-server", mcp_app)
-app.mount("/notion-native-mcp", notion_mcp_app)
 
 
 @app.get("/")

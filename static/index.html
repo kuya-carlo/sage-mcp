@@ -32,7 +32,7 @@
             </div>
 
             <button id="login-btn" class="glow-btn">
-                Continue with Notion
+                Connect Notion
             </button>
         </div>
 
@@ -95,13 +95,22 @@
 
             // Login action
             document.getElementById('login-btn').addEventListener('click', () => {
-                window.location.href = '/auth/notion';
+                let sessionId = localStorage.getItem('sage_session_id');
+                if (!sessionId) {
+                    sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('sage_session_id', sessionId);
+                }
+                window.location.href = `/auth/notion?session_id=${sessionId}`;
             });
 
             // Burnout Meter logic
             const updateLoadStatus = async () => {
+                const sessionId = localStorage.getItem('sage_session_id');
+                if (!sessionId) return;
                 try {
-                    const res = await fetch('/mcp/load-status');
+                    const res = await fetch('/mcp/load-status', {
+                        headers: { 'X-Session-ID': sessionId }
+                    });
                     if (!res.ok) return;
                     const data = await res.json();
 
@@ -151,25 +160,41 @@
                     localStorage.setItem('theme', 'light');
                 }
             });
+
+            // Disconnect / Logout handler
+            const logoutLink = document.querySelector('a[href="/auth/logout"]');
+            if (logoutLink) {
+                logoutLink.href = "/auth/notion/logout"; // Update to new endpoint
+                logoutLink.addEventListener('click', () => {
+                    localStorage.removeItem('sage_session_id');
+                });
+            }
             // Init theme
             if (localStorage.getItem('theme') === 'light') {
                 document.documentElement.setAttribute('data-theme', 'light');
             }
 
             // Check Auth Status
-            fetch('/auth/status')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.authenticated) {
-                        switchView('chat');
-                    } else {
+            const sessionId = localStorage.getItem('sage_session_id');
+            if (sessionId) {
+                fetch(`/auth/notion/status?session_id=${sessionId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.authenticated) {
+                            document.getElementById('login-btn').textContent = "Notion connected ✓";
+                            document.getElementById('login-btn').style.background = "var(--success-glass)";
+                            switchView('chat');
+                        } else {
+                            switchView('login');
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Auth check failed:", err);
                         switchView('login');
-                    }
-                })
-                .catch(err => {
-                    console.error("Auth check failed:", err);
-                    switchView('login');
-                });
+                    });
+            } else {
+                switchView('login');
+            }
 
             // Chat logic
             const sendBtn = document.getElementById('send-btn');
@@ -233,9 +258,13 @@
                 document.getElementById('stop-btn').classList.remove('hidden');
 
                 try {
+                    const sessionId = localStorage.getItem('sage_session_id');
                     const res = await fetch('/mcp/chat', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Session-ID': sessionId
+                        },
                         body: JSON.stringify({ message: text }),
                         signal: currentController.signal
                     });

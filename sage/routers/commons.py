@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from sage.database import get_db_pool
 from sage.models.cmo import CMORecord
-from sage.routers.auth import get_current_user
+from sage.routers.notion_auth import get_session_id
 
 router = APIRouter(prefix="/commons", tags=["Ghost Commons API"])
 
@@ -21,7 +21,7 @@ async def get_programs():
 
 @router.get("/tree", response_model=list[CMORecord])
 async def get_commons_tree(
-    program_code: str, year_level: int, semester: int, workspace_id: str = Depends(get_current_user)
+    program_code: str, year_level: int, semester: int, workspace_id: str = Depends(get_session_id)
 ):
     """Returns the CMO records for a specific program, year, and semester."""
     pool = await get_db_pool()
@@ -41,7 +41,7 @@ async def get_commons_tree(
 
 @router.get("/search", response_model=list[CMORecord])
 async def search_commons(
-    q: str = Query(..., description="Search query"), workspace_id: str = Depends(get_current_user)
+    q: str = Query(..., description="Search query"), workspace_id: str = Depends(get_session_id)
 ):
     """Searches courses by title or competency tag."""
     pool = await get_db_pool()

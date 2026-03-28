@@ -3,10 +3,8 @@ import json
 import httpx
 
 from sage.config import settings
-from sage.services.mcp_tools.workspace import get_decrypted_token
+from sage.routers.notion_auth import get_notion_token
 from sage.services.notion import NotionService
-
-notion_service = NotionService()
 
 BREAKDOWN_SYSTEM_PROMPT = """
 You are SAGE. You receive a task title and optional notes.
@@ -76,7 +74,8 @@ async def call_breakdown_model(task_title: str, task_notes: str) -> dict:
 
 
 async def breakdown_task(task_id: str, task_title: str, task_notes: str, workspace_id: str) -> dict:
-    access_token, _ = await get_decrypted_token(workspace_id)
+    access_token = await get_notion_token(workspace_id)
+    notion_service = NotionService(access_token=access_token)
 
     breakdown_res = await call_breakdown_model(task_title, task_notes or "none")
     micro_steps = breakdown_res.get("micro_steps", [])
@@ -92,12 +91,9 @@ async def breakdown_task(task_id: str, task_title: str, task_notes: str, workspa
         if is_micro_start and micro_start_step_action is None:
             micro_start_step_action = action
 
-        await notion_service.create_page(
-            access_token=access_token, parent_id=task_id, title=action, icon_emoji=icon
-        )
+        await notion_service.create_page(parent_id=task_id, title=action, icon_emoji=icon)
 
     await notion_service.update_page_property(
-        access_token=access_token,
         page_id=task_id,
         property_name="Needs Breakdown",
         value={"checkbox": False},

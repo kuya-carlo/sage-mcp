@@ -1,7 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
-from sage.routers.auth import get_current_user
 from sage.services.agent import TOOLS_SCHEMA, run_agent_loop
 
 router = APIRouter(prefix="/mcp", tags=["MCP Server"])
@@ -11,8 +10,12 @@ class ChatRequest(BaseModel):
     message: str
 
 
+async def get_session_id(x_session_id: str = Header(..., alias="X-Session-ID")) -> str:
+    return x_session_id
+
+
 @router.post("/chat")
-async def mcp_chat(request: ChatRequest, workspace_id: str = Depends(get_current_user)):
+async def mcp_chat(request: ChatRequest, workspace_id: str = Depends(get_session_id)):
     """
     Accepts a chat message and runs it against the Claude agentic loop
     with MCP tools exposed.
@@ -32,7 +35,7 @@ async def get_mcp_tools():
 
 
 @router.get("/load-status")
-async def get_load_status(workspace_id: str = Depends(get_current_user)):
+async def get_load_status(workspace_id: str = Depends(get_session_id)):
     """
     Fetches the current week's weight/burnout score from the Notion Tasks DB.
     """

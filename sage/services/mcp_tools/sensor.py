@@ -2,14 +2,13 @@ from datetime import datetime, timedelta
 
 from sage.config import settings
 from sage.database import get_db_pool
-from sage.services.mcp_tools.workspace import get_decrypted_token
+from sage.routers.notion_auth import get_notion_token
 from sage.services.notion import NotionService
-
-notion_service = NotionService()
 
 
 async def get_weekly_load(workspace_id: str, week_start_date: str) -> dict:
-    access_token, _ = await get_decrypted_token(workspace_id)
+    access_token = await get_notion_token(workspace_id)
+    notion_service = NotionService(access_token=access_token)
 
     start_dt = datetime.fromisoformat(week_start_date)
     week_end_dt = start_dt + timedelta(days=6)
@@ -17,15 +16,13 @@ async def get_weekly_load(workspace_id: str, week_start_date: str) -> dict:
     week_end = week_end_dt.strftime("%Y-%m-%d")
 
     # 2. Get Tasks databases
-    databases = await notion_service.search_databases(access_token, query="Tasks")
+    databases = await notion_service.search_databases(query="Tasks")
 
     async def get_tasks_count_for_week(db_list: list, w_start: str, w_end: str) -> int:
         count = 0
         for db in db_list:
             db_id = db["id"]
-            tasks = await notion_service.query_tasks_due_this_week(
-                access_token, db_id, w_start, w_end
-            )
+            tasks = await notion_service.query_tasks_due_this_week(db_id, w_start, w_end)
             count += len(tasks)
         return count
 
@@ -60,9 +57,12 @@ async def get_weekly_load(workspace_id: str, week_start_date: str) -> dict:
 
 
 async def block_calendar_slot(workspace_id: str, date: str, label: str) -> dict:
-    access_token, saved_root_id = await get_decrypted_token(workspace_id)
+    access_token = await get_notion_token(workspace_id)
+    # Note: we ignore saved_root_id for now as we're migrating to pure token based
+    # Wait, workspace_id is usually a UUID.
+    notion_service = NotionService(access_token=access_token)
 
-    databases = await notion_service.search_databases(access_token, query="SAGE Calendar")
+    databases = await notion_service.search_databases(query="SAGE Calendar")
 
     calendar_db_id = None
     for db in databases:
@@ -77,11 +77,11 @@ async def block_calendar_slot(workspace_id: str, date: str, label: str) -> dict:
 
     if not calendar_db_id:
         # 1. Use Config -> Saved DB ID -> Search Fallback
-        parent_page_id = settings.notion_root_page_id or saved_root_id
+        parent_page_id = settings.notion_root_page_id
 
         if not parent_page_id:
             # If not configured or saved, we try to find ONE page to act as parent
-            pages = await notion_service.search_pages(access_token, query="")
+            pages = await notion_service.search_pages(query="")
             if not pages:
                 raise ValueError(
                     "Could not find any pages to host the SAGE Calendar. Grant access to a page!"
@@ -96,7 +96,6 @@ async def block_calendar_slot(workspace_id: str, date: str, label: str) -> dict:
 
         db_properties = {"Name": {"title": {}}, "Date": {"date": {}}, "Protected": {"checkbox": {}}}
         db_res = await notion_service.create_database(
-            access_token=access_token,
             parent_page_id=parent_page_id,
             title="SAGE Calendar",
             properties=db_properties,
@@ -104,7 +103,6 @@ async def block_calendar_slot(workspace_id: str, date: str, label: str) -> dict:
         calendar_db_id = db_res["id"]
 
     entry_res = await notion_service.create_calendar_entry(
-        access_token=access_token,
         calendar_db_id=calendar_db_id,
         title=label,
         date=date,
