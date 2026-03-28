@@ -93,19 +93,38 @@
                 chat: document.getElementById('chat-view')
             };
 
+            let pollInterval = null;
+
+            const pollAuthStatus = (sessionId) => {
+                if (pollInterval) clearInterval(pollInterval);
+                pollInterval = setInterval(async () => {
+                    try {
+                        const res = await fetch(`/auth/notion/status?session_id=${sessionId}`);
+                        const data = await res.json();
+                        if (data.authenticated) {
+                            clearInterval(pollInterval);
+                            window.location.reload();
+                        }
+                    } catch (err) {
+                        console.error("Polling failed:", err);
+                    }
+                }, 2000);
+            };
+
             // Login action
             document.getElementById('login-btn').addEventListener('click', () => {
-                let sessionId = localStorage.getItem('sage_session_id');
+                let sessionId = localStorage.getItem('session_id');
                 if (!sessionId) {
                     sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('sage_session_id', sessionId);
+                    localStorage.setItem('session_id', sessionId);
                 }
-                window.location.href = `/auth/notion?session_id=${sessionId}`;
+                window.open(`/auth/notion?session_id=${sessionId}`, '_blank');
+                pollAuthStatus(sessionId);
             });
 
             // Burnout Meter logic
             const updateLoadStatus = async () => {
-                const sessionId = localStorage.getItem('sage_session_id');
+                const sessionId = localStorage.getItem('session_id');
                 if (!sessionId) return;
                 try {
                     const res = await fetch('/mcp/load-status', {
@@ -166,7 +185,7 @@
             if (logoutLink) {
                 logoutLink.href = "/auth/notion/logout"; // Update to new endpoint
                 logoutLink.addEventListener('click', () => {
-                    localStorage.removeItem('sage_session_id');
+                    localStorage.removeItem('session_id');
                 });
             }
             // Init theme
@@ -175,14 +194,18 @@
             }
 
             // Check Auth Status
-            const sessionId = localStorage.getItem('sage_session_id');
+            const sessionId = localStorage.getItem('session_id');
+            const loginBtn = document.getElementById('login-btn');
             if (sessionId) {
                 fetch(`/auth/notion/status?session_id=${sessionId}`)
                     .then(res => res.json())
                     .then(data => {
                         if (data.authenticated) {
-                            document.getElementById('login-btn').textContent = "Notion connected ✓";
-                            document.getElementById('login-btn').style.background = "var(--success-glass)";
+                            loginBtn.textContent = "Notion connected ✓";
+                            loginBtn.style.background = "var(--success-glass)";
+                            loginBtn.style.cursor = "default";
+                            loginBtn.disabled = true;
+                            loginBtn.onclick = (e) => e.preventDefault();
                             switchView('chat');
                         } else {
                             switchView('login');
@@ -258,7 +281,7 @@
                 document.getElementById('stop-btn').classList.remove('hidden');
 
                 try {
-                    const sessionId = localStorage.getItem('sage_session_id');
+                    const sessionId = localStorage.getItem('session_id');
                     const res = await fetch('/mcp/chat', {
                         method: 'POST',
                         headers: {

@@ -1,4 +1,6 @@
+import asyncio
 import json
+import logging
 import re
 
 import httpx
@@ -7,6 +9,8 @@ from sage.config import settings
 from sage.database import get_db_pool
 from sage.routers.notion_auth import get_notion_token
 from sage.services.notion import NotionService
+
+logger = logging.getLogger("workspace")
 
 
 async def get_commons_for_program(program_code: str, year_level: int, semester: int) -> list[dict]:
@@ -21,7 +25,26 @@ async def get_commons_for_program(program_code: str, year_level: int, semester: 
         return [dict(record) for record in records]
 
 
-async def expand_topics_for_course(course_title: str, competency_tags: list[str]) -> list:
+async def expand_topics_for_course(
+    course_code: str, course_title: str, competency_tags: list[str]
+) -> list:
+    """Check DB for predefined topics first, then fallback to AI if missing."""
+    pool = await get_db_pool()
+    query = """
+        SELECT topic_name as topic, competency, summary, study_prompt
+        FROM curriculum_topics
+        WHERE course_code = $1
+        ORDER BY topic_order
+    """
+
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(query, course_code)
+        if rows:
+            logger.info(f"Using {len(rows)} predefined topics for {course_code}")
+            return [dict(row) for row in rows]
+
+    # Fallback to AI if no topics in DB
+    logger.info(f"Expanding topics via AI for {course_title}")
     url = f"{settings.vultr_inference_url}/chat/completions"
     headers = {
         "Authorization": f"Bearer {settings.vultr_inference_key}",
@@ -77,7 +100,7 @@ Rules:
                         item["competency"] = valid_tags[0]
                 return data
     except Exception as e:
-        print(f"Error expanding topics: {e}")
+        logger.error(f"Error expanding topics for {course_title}: {e}")
 
     # Fallback
     return [
@@ -91,132 +114,125 @@ async def create_semester_tree(
     year_level: int,
     semester: int,
     workspace_id: str,
-    workspace_root_id: str = "",
 ) -> dict:
-    # 1. get_notion_token
     access_token = await get_notion_token(workspace_id)
-    notion_service = NotionService(access_token=access_token)
-    # Note: We ignore saved_root_id from old system
-    saved_root_id = None
-
-    # Use explicitly passed ID, or saved ID, or fallback to search
-    if not workspace_root_id:
-        if saved_root_id:
-            workspace_root_id = saved_root_id
-        else:
-            pages = await notion_service.search_pages(query="")
-            if not pages:
-                return {
-                    "status": "error",
-                    "message": "No accessible pages found! SAGE needs access to at least one Notion page to build under.",
-                }
-            workspace_root_id = pages[0]["id"]
-
-            # Save the derived root ID back to the database
-            pool = await get_db_pool()
-            save_query = "UPDATE user_tokens SET root_page_id = $1 WHERE workspace_id = $2"
-            async with pool.acquire() as connection:
-                await connection.execute(save_query, workspace_root_id, workspace_id)
-
-    # 2. get_commons_for_program
-    commons = await get_commons_for_program(program_code, year_level, semester)
-
-    # 3. Search for existing page
-    page_title = f"{program_code} — Year {year_level} Sem {semester}"
-    search_results = await notion_service.search_pages(query=page_title)
-
-    # Check if a matching page already exists within the current root
-    for result in search_results:
-        # Check if title strictly matches (Notion search can be fuzzy)
-        title_prop = result.get("properties", {}).get("title", {}).get("title", [])
-        extracted_title = "".join(t.get("plain_text", "") for t in title_prop) if title_prop else ""
-
-        # Check parent constraint (Ensure we're not false-flagging identically named pages elsewhere)
-        parent_id = result.get("parent", {}).get("page_id", "").replace("-", "")
-        formatted_root_id = workspace_root_id.replace("-", "")
-
-        if extracted_title == page_title and parent_id == formatted_root_id:
-            return {"status": "already_exists", "root_page_id": result["id"]}
-
-    # 4. Create root page titled "{program_code} — Year {year_level} Sem {semester}" under workspace_root_id with icon 🎓
-    root_page_response = await notion_service.create_page(
-        parent_id=workspace_root_id, title=page_title, icon_emoji="🎓"
-    )
-    new_root_page_id = root_page_response["id"]
-
-    created_pages = 0
-    created_databases = 0
-
-    # 5. For each course in commons
-    for course in commons:
-        course_title = course.get("course_title", "Unknown Course")
-        competency_tags = course.get("competency_tags", [])
-
-        # a. Create sub-page titled course_title under root page with icon 📖
-        sub_page_response = await notion_service.create_page(
-            parent_id=new_root_page_id,
-            title=course_title,
-            icon_emoji="📖",
+    async with NotionService(access_token=access_token) as notion_service:
+        return await _create_semester_tree_impl(
+            program_code, year_level, semester, workspace_id, notion_service
         )
-        sub_page_id = sub_page_response["id"]
-        created_pages += 1
 
-        # b. Create Tasks database inside sub-page
-        db_properties = {
-            "Name": {"title": {}},
-            "Status": {
-                "select": {
-                    "options": [
-                        {"name": "Todo", "color": "red"},
-                        {"name": "In Progress", "color": "yellow"},
-                        {"name": "Done", "color": "green"},
-                    ]
-                }
-            },
-            "Due Date": {"date": {}},
-            "Needs Breakdown": {"checkbox": {}},
+
+async def _create_semester_tree_impl(
+    program_code: str,
+    year_level: int,
+    semester: int,
+    workspace_id: str,
+    notion_service: NotionService,
+) -> dict:
+    # 1. Create Workspace root page
+    root_title = f"SAGE — {program_code} Y{year_level}S{semester}"
+    root_create_res = await notion_service.create_root_page(root_title)
+    if "error" in root_create_res:
+        return {
+            "status": "error",
+            "message": f"Failed to create root page: {root_create_res['error']}",
         }
 
-        await notion_service.create_database(
+    new_root_page_id = root_create_res["id"]
+
+    # Save root ID
+    pool = await get_db_pool()
+    save_query = "UPDATE user_tokens SET root_page_id = $1 WHERE workspace_id = $2"
+    async with pool.acquire() as connection:
+        await connection.execute(save_query, new_root_page_id, workspace_id)
+
+    # 2. Get Commons and parallelize course creation with a global semaphore
+    commons = await get_commons_for_program(program_code, year_level, semester)
+
+    global_sem = asyncio.Semaphore(2)  # Limit total courses being built concurrently
+
+    async def create_course_with_dbs(course: dict):
+        async with global_sem:
+            course_title = course.get("course_title", "Unknown Course")
+            competency_tags = course.get("competency_tags", [])
+            course_code = course.get("course_code", "UNKNOWN")
+
+            # Small delay between courses to let SSE settle
+            await asyncio.sleep(0.5)
+
+            # a. Create course page
+            sub_page_response = await notion_service.create_page(
+                parent_id=new_root_page_id,
+                title=course_title,
+                icon_emoji="📖",
+            )
+        if "error" in sub_page_response:
+            return 0, 0
+
+        sub_page_id = sub_page_response["id"]
+
+        # b. Create Databases in parallel
+        tasks_db_coro = notion_service.create_database(
             parent_page_id=sub_page_id,
             title="Tasks",
-            properties=db_properties,
-        )
-        created_databases += 1
-
-        # c. Create Topics Database inside sub-page
-        if competency_tags:
-            topics_db_properties = {
-                "Topic": {"title": {}},
-                "Competency": {
-                    "select": {
-                        "options": [{"name": str(tag), "color": "blue"} for tag in competency_tags]
-                    }
-                },
+            properties={
+                "Name": {"title": {}},
                 "Status": {
                     "select": {
                         "options": [
-                            {"name": "Not Started", "color": "red"},
+                            {"name": "Todo", "color": "red"},
                             {"name": "In Progress", "color": "yellow"},
-                            {"name": "Mastered", "color": "green"},
+                            {"name": "Done", "color": "green"},
                         ]
                     }
                 },
-            }
+                "Due Date": {"date": {}},
+                "Needs Breakdown": {"checkbox": {}},
+            },
+        )
 
-            topics_db_response = await notion_service.create_database(
+        topics_db_coro = None
+        if competency_tags:
+            topics_db_coro = notion_service.create_database(
                 parent_page_id=sub_page_id,
-                title="Topics & Competencies",
-                properties=topics_db_properties,
+                title="topics",
+                properties={
+                    "Topic": {"title": {}},
+                    "Competency": {
+                        "select": {
+                            "options": [
+                                {"name": str(tag), "color": "blue"} for tag in competency_tags
+                            ]
+                        }
+                    },
+                    "Status": {
+                        "select": {
+                            "options": [
+                                {"name": "Not Started", "color": "red"},
+                                {"name": "In Progress", "color": "yellow"},
+                                {"name": "Mastered", "color": "green"},
+                            ]
+                        }
+                    },
+                },
             )
-            created_databases += 1
+
+        db_results = (
+            await asyncio.gather(tasks_db_coro, topics_db_coro)
+            if topics_db_coro
+            else [await tasks_db_coro, None]
+        )
+
+        num_dbs = 1
+        topics_db_response = db_results[1]
+        if topics_db_response and "error" not in topics_db_response:
+            num_dbs += 1
             topics_db_id = topics_db_response["id"]
+            expanded_topics = await expand_topics_for_course(
+                course_code, course_title, competency_tags
+            )
 
-            # Expand competency tags into actual topics via AI
-            expanded_topics = await expand_topics_for_course(course_title, competency_tags)
-
-            for topic_item in expanded_topics:
-                # Create database entry
+            async def create_topic_with_content(topic_item: dict):
                 entry = await notion_service.create_database_entry(
                     database_id=topics_db_id,
                     properties={
@@ -225,62 +241,88 @@ async def create_semester_tree(
                         "Status": {"select": {"name": "Not Started"}},
                     },
                 )
-
-                # Add summary and study prompt as page content
-                if topic_item.get("summary") or topic_item.get("study_prompt"):
-                    children = [
-                        {
-                            "object": "block",
-                            "type": "heading_2",
-                            "heading_2": {
-                                "rich_text": [{"type": "text", "text": {"content": "Summary"}}]
-                            },
-                        },
-                        {
-                            "object": "block",
-                            "type": "paragraph",
-                            "paragraph": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {"content": topic_item.get("summary", "")},
-                                    }
-                                ]
-                            },
-                        },
-                        {
-                            "object": "block",
-                            "type": "heading_2",
-                            "heading_2": {
-                                "rich_text": [{"type": "text", "text": {"content": "Study Prompt"}}]
-                            },
-                        },
-                        {
-                            "object": "block",
-                            "type": "callout",
-                            "callout": {
-                                "rich_text": [
-                                    {
-                                        "type": "text",
-                                        "text": {"content": topic_item.get("study_prompt", "")},
-                                    }
-                                ],
-                                "icon": {"emoji": "🎯"},
-                            },
-                        },
-                    ]
-
+                if "error" not in entry and (
+                    topic_item.get("summary") or topic_item.get("study_prompt")
+                ):
+                    children = []
+                    if topic_item.get("summary"):
+                        children.extend(
+                            [
+                                {
+                                    "object": "block",
+                                    "type": "heading_2",
+                                    "heading_2": {
+                                        "rich_text": [
+                                            {"type": "text", "text": {"content": "Summary"}}
+                                        ]
+                                    },
+                                },
+                                {
+                                    "object": "block",
+                                    "type": "paragraph",
+                                    "paragraph": {
+                                        "rich_text": [
+                                            {
+                                                "type": "text",
+                                                "text": {"content": topic_item["summary"]},
+                                            }
+                                        ]
+                                    },
+                                },
+                            ]
+                        )
+                    if topic_item.get("study_prompt"):
+                        children.extend(
+                            [
+                                {
+                                    "object": "block",
+                                    "type": "heading_2",
+                                    "heading_2": {
+                                        "rich_text": [
+                                            {"type": "text", "text": {"content": "Study Prompt"}}
+                                        ]
+                                    },
+                                },
+                                {
+                                    "object": "block",
+                                    "type": "callout",
+                                    "callout": {
+                                        "rich_text": [
+                                            {
+                                                "type": "text",
+                                                "text": {"content": topic_item["study_prompt"]},
+                                            }
+                                        ],
+                                        "icon": {"emoji": "🎯"},
+                                    },
+                                },
+                            ]
+                        )
                     await notion_service.append_block_children(
                         page_id=entry["id"], children=children
                     )
 
-    # 6. Return response
+            sem = asyncio.Semaphore(2)
+
+            async def create_topic_with_sem(t):
+                async with sem:
+                    await create_topic_with_content(t)
+                    await asyncio.sleep(0.3)
+
+            if expanded_topics:
+                await asyncio.gather(*(create_topic_with_sem(t) for t in expanded_topics))
+
+        return 1, num_dbs
+
+    # 3. Parallelize Course Creation
+    results = await asyncio.gather(*(create_course_with_dbs(c) for c in commons))
+
     return {
         "status": "created",
         "root_page_id": new_root_page_id,
         "program_code": program_code,
         "year_level": year_level,
         "semester": semester,
-        "created_pages": created_pages,
-        "created_databases": created_databases,
+        "created_pages": sum(r[0] for r in results),
+        "created_databases": sum(r[1] for r in results),
     }

@@ -6,8 +6,6 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 5463
     db_url: str
-    notion_client_id: str
-    notion_client_secret: str
     notion_redirect_uri: str
     fernet_key: str
     openrouter_api_key: str | None = None

@@ -22,7 +22,7 @@ class Database:
         self.pool = await asyncpg.create_pool(
             dsn=dsn,
             min_size=1,
-            max_size=5,  # Supabase session mode limit
+            max_size=10,  # Increased from 5 to avoid exhaustion
         )
 
     async def disconnect(self):

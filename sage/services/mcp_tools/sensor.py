@@ -6,10 +6,17 @@ from sage.routers.notion_auth import get_notion_token
 from sage.services.notion import NotionService
 
 
-async def get_weekly_load(workspace_id: str, week_start_date: str) -> dict:
-    access_token = await get_notion_token(workspace_id)
-    notion_service = NotionService(access_token=access_token)
+async def get_weekly_load(
+    workspace_id: str, week_start_date: str, notion_service: NotionService | None = None
+) -> dict:
+    if notion_service is None:
+        access_token = await get_notion_token(workspace_id)
+        async with NotionService(access_token=access_token) as ns:
+            return await _get_weekly_load_impl(ns, week_start_date)
+    return await _get_weekly_load_impl(notion_service, week_start_date)
 
+
+async def _get_weekly_load_impl(notion_service: NotionService, week_start_date: str) -> dict:
     start_dt = datetime.fromisoformat(week_start_date)
     week_end_dt = start_dt + timedelta(days=6)
     week_start = start_dt.strftime("%Y-%m-%d")
@@ -56,12 +63,19 @@ async def get_weekly_load(workspace_id: str, week_start_date: str) -> dict:
     }
 
 
-async def block_calendar_slot(workspace_id: str, date: str, label: str) -> dict:
-    access_token = await get_notion_token(workspace_id)
-    # Note: we ignore saved_root_id for now as we're migrating to pure token based
-    # Wait, workspace_id is usually a UUID.
-    notion_service = NotionService(access_token=access_token)
+async def block_calendar_slot(
+    workspace_id: str, date: str, label: str, notion_service: NotionService | None = None
+) -> dict:
+    if notion_service is None:
+        access_token = await get_notion_token(workspace_id)
+        async with NotionService(access_token=access_token) as ns:
+            return await _block_calendar_slot_impl(workspace_id, date, label, ns)
+    return await _block_calendar_slot_impl(workspace_id, date, label, notion_service)
 
+
+async def _block_calendar_slot_impl(
+    workspace_id: str, date: str, label: str, notion_service: NotionService
+) -> dict:
     databases = await notion_service.search_databases(query="SAGE Calendar")
 
     calendar_db_id = None
@@ -80,13 +94,9 @@ async def block_calendar_slot(workspace_id: str, date: str, label: str) -> dict:
         parent_page_id = settings.notion_root_page_id
 
         if not parent_page_id:
-            # If not configured or saved, we try to find ONE page to act as parent
-            pages = await notion_service.search_pages(query="")
-            if not pages:
-                raise ValueError(
-                    "Could not find any pages to host the SAGE Calendar. Grant access to a page!"
-                )
-            parent_page_id = pages[0]["id"]
+            # Create a new root page if none exists
+            res = await notion_service.create_root_page("SAGE Workspace Root")
+            parent_page_id = res["id"]
 
             # Save this page as the user's preferred root for future use
             pool = await get_db_pool()

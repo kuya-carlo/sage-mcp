@@ -73,10 +73,23 @@ async def call_breakdown_model(task_title: str, task_notes: str) -> dict:
     return parsed_dict
 
 
-async def breakdown_task(task_id: str, task_title: str, task_notes: str, workspace_id: str) -> dict:
-    access_token = await get_notion_token(workspace_id)
-    notion_service = NotionService(access_token=access_token)
+async def breakdown_task(
+    task_id: str,
+    task_title: str,
+    task_notes: str,
+    workspace_id: str,
+    notion_service: NotionService | None = None,
+) -> dict:
+    if notion_service is None:
+        access_token = await get_notion_token(workspace_id)
+        async with NotionService(access_token=access_token) as ns:
+            return await _breakdown_task_impl(task_id, task_title, task_notes, ns)
+    return await _breakdown_task_impl(task_id, task_title, task_notes, notion_service)
 
+
+async def _breakdown_task_impl(
+    task_id: str, task_title: str, task_notes: str, notion_service: NotionService
+) -> dict:
     breakdown_res = await call_breakdown_model(task_title, task_notes or "none")
     micro_steps = breakdown_res.get("micro_steps", [])
 
