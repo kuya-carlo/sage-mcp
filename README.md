@@ -1,7 +1,7 @@
 # SAGE — Student Agent for Guided Education
 > Your autonomous academic co-pilot, built purely on Notion and FastMCP.
 
-![SAGE Demo](assets/demo.gif)
+[![SAGE Demo Video](https://img.youtube.com/vi/Ua9ZzSBXpbw/maxresdefault.jpg)](https://youtu.be/Ua9ZzSBXpbw)
 
 Built for **MLH Global Hack Week — Notion AI Challenge**
 
